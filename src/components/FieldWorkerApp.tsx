@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useCivic } from '../context/CivicContext';
 import { BeforeAfterSlider } from './BeforeAfterSlider';
 import { DeviceCameraCapture } from './DeviceCameraCapture';
-import { CIVIC_PRESET_IMAGES } from '../data/seedData';
 import { CivicIncident } from '../types';
 import { getDeadlineCountdown } from '../utils/deadlines';
 import {
@@ -48,13 +47,9 @@ export const FieldWorkerApp: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'assigned' | 'in_progress' | 'pending' | 'completed' | 'notifications'>('assigned');
   const [selectedTask, setSelectedTask] = useState<CivicIncident | null>(null);
-  const [afterPhotoUrl, setAfterPhotoUrl] = useState<string>(CIVIC_PRESET_IMAGES.potholeAfter);
-  const [repairNotes, setRepairNotes] = useState<string>(
-    'Hot bituminous cold mix compaction completed. Surface leveled to grade and sealed with asphalt emulsion.'
-  );
-  const [materialsLogged, setMaterialsLogged] = useState<string>(
-    '50kg Bitumen Cold Mix Type II, Bituminous Emulsion RS-1 (10L), Plate Compactor Unit 4'
-  );
+  const [afterPhotoUrl, setAfterPhotoUrl] = useState<string>('');
+  const [repairNotes, setRepairNotes] = useState<string>('');
+  const [materialsLogged, setMaterialsLogged] = useState<string>('');
   const [isCapturingProof, setIsCapturingProof] = useState<boolean>(false);
   const [isSubmittingProof, setIsSubmittingProof] = useState<boolean>(false);
   const [isOfflineSynced, setIsOfflineSynced] = useState<boolean>(true);
@@ -87,10 +82,9 @@ export const FieldWorkerApp: React.FC = () => {
 
   const handleOpenProofModal = (task: CivicIncident) => {
     setSelectedTask(task);
-    if (task.category === 'Pothole') setAfterPhotoUrl(CIVIC_PRESET_IMAGES.potholeAfter);
-    else if (task.category === 'Garbage') setAfterPhotoUrl(CIVIC_PRESET_IMAGES.garbageAfter);
-    else if (task.category === 'Streetlight') setAfterPhotoUrl(CIVIC_PRESET_IMAGES.streetlightAfter);
-    else setAfterPhotoUrl(CIVIC_PRESET_IMAGES.waterLeakAfter);
+    setAfterPhotoUrl('');
+    setRepairNotes('');
+    setMaterialsLogged('');
     setIsCapturingProof(true);
     playSound('click');
   };
@@ -608,22 +602,14 @@ export const FieldWorkerApp: React.FC = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--slate-700)', marginBottom: '4px' }}>
-                  Completion Photo Proof:
+                  Capture or Upload Completion Photo Proof:
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={afterPhotoUrl}
-                  onChange={(e) => setAfterPhotoUrl(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-300)', fontSize: '0.8rem' }}
+                <DeviceCameraCapture
+                  initialPhotoUrl={afterPhotoUrl || null}
+                  categoryName={`Repaired ${selectedTask.category}`}
+                  onPhotoCaptured={(capturedDataUrl) => setAfterPhotoUrl(capturedDataUrl)}
+                  onPhotoCleared={() => setAfterPhotoUrl('')}
                 />
-                {afterPhotoUrl && (
-                  <img
-                    src={afterPhotoUrl}
-                    alt="Completion Proof"
-                    style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: 'var(--radius-md)', marginTop: '8px', border: '1px solid var(--slate-200)' }}
-                  />
-                )}
               </div>
 
               <div>
@@ -633,6 +619,7 @@ export const FieldWorkerApp: React.FC = () => {
                 <textarea
                   rows={2}
                   value={repairNotes}
+                  placeholder="Describe repair procedures performed on the ground..."
                   onChange={(e) => setRepairNotes(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-300)', fontSize: '0.8rem' }}
                 />
@@ -645,6 +632,7 @@ export const FieldWorkerApp: React.FC = () => {
                 <input
                   type="text"
                   value={materialsLogged}
+                  placeholder="e.g. Bitumen cold mix 50kg, compactor unit #2"
                   onChange={(e) => setMaterialsLogged(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-300)', fontSize: '0.8rem' }}
                 />
@@ -656,10 +644,15 @@ export const FieldWorkerApp: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  disabled={isSubmittingProof}
+                  disabled={isSubmittingProof || !afterPhotoUrl}
                   onClick={() => handleSubmitProof(selectedTask.id)}
                   className="btn btn-primary"
-                  style={{ background: '#059669', borderColor: '#059669', fontWeight: 700 }}
+                  style={{
+                    background: '#059669',
+                    borderColor: '#059669',
+                    fontWeight: 700,
+                    opacity: !afterPhotoUrl ? 0.6 : 1
+                  }}
                 >
                   {isSubmittingProof ? 'Submitting to Officer...' : 'Submit to Officer for Verification'}
                 </button>

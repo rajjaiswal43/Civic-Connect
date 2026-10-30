@@ -518,17 +518,17 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         totalScore: 82
       },
       location: incidentData.location || {
-        lat: 28.4632,
-        lng: 77.4912,
-        address: 'Sector Knowledge Park III, Greater Noida',
-        ward: 'Ward 12',
-        landmark: 'Near Central Commercial Belt',
+        lat: 0,
+        lng: 0,
+        address: 'Location not specified',
+        ward: 'Ward Unassigned',
+        landmark: '',
         isPublicSafePrecision: true
       },
       evidence: incidentData.evidence || {
-        beforePhotoUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
+        beforePhotoUrl: '',
         photoTimestamp: formattedDate,
-        gpsVerified: true,
+        gpsVerified: false,
         provenance: 'live_camera'
       },
       aiMetadata: incidentData.aiMetadata || {

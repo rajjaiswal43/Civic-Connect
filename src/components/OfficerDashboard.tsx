@@ -884,11 +884,19 @@ export const OfficerDashboard: React.FC = () => {
                           Geo-Verified Ground Proof ✓
                         </span>
                       </div>
-                      <img
-                        src={inc.evidence.afterPhotoUrl || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80'}
-                        alt="Completed Work"
-                        style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
-                      />
+                      {inc.evidence.afterPhotoUrl ? (
+                        <img
+                          src={inc.evidence.afterPhotoUrl}
+                          alt="Completed Work"
+                          style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
+                        />
+                      ) : (
+                        <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#dcfce7', borderRadius: 'var(--radius-md)', color: '#15803d', padding: '1rem', textAlign: 'center' }}>
+                          <CheckCircle2 size={32} style={{ marginBottom: '8px' }} />
+                          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Work Completion Marked</span>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>No post-repair photographic proof attached</span>
+                        </div>
+                      )}
                       <p style={{ fontSize: '0.75rem', color: '#166534', margin: '6px 0 0 0', lineHeight: 1.35 }}>
                         <strong>Work Performed:</strong> {inc.workerNotes || 'Repairs completed to municipal specification.'}
                       </p>

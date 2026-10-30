@@ -1,18 +1,23 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle2, AlertTriangle, Upload, Sparkles, SwitchCamera, Zap, X } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, AlertTriangle, Upload, SwitchCamera, X, Image as ImageIcon } from 'lucide-react';
+import { getExifGpsCoordinates } from '../utils/exifGps';
 
 interface DeviceCameraCaptureProps {
-  onPhotoCaptured: (photoDataUrl: string, provenance: 'live_camera' | 'gallery_upload') => void;
-  initialPhotoUrl?: string;
+  onPhotoCaptured: (
+    photoDataUrl: string,
+    provenance: 'live_camera' | 'gallery_upload',
+    exifCoords?: { lat: number; lng: number }
+  ) => void;
+  onPhotoCleared?: () => void;
   categoryName?: string;
-  defaultSampleUrl?: string;
+  initialPhotoUrl?: string | null;
 }
 
 export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
   onPhotoCaptured,
-  initialPhotoUrl,
+  onPhotoCleared,
   categoryName = 'Civic Hazard',
-  defaultSampleUrl
+  initialPhotoUrl = null
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -21,10 +26,24 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(initialPhotoUrl || null);
+  const [capturedProvenance, setCapturedProvenance] = useState<'live_camera' | 'gallery_upload'>('live_camera');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'sample'>('camera');
+
+  // Sync if initialPhotoUrl changes
+  useEffect(() => {
+    if (initialPhotoUrl !== undefined) {
+      setCapturedPhoto(initialPhotoUrl);
+    }
+  }, [initialPhotoUrl]);
+
+  // Clean up media stream on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stream]);
 
   // Start real device camera
   const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
@@ -38,12 +57,12 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported on this browser/environment.');
+        throw new Error('Camera API is not supported in this browser environment.');
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: mode,
+          facingMode: { ideal: mode },
           width: { ideal: 1280 },
           height: { ideal: 720 }
         },
@@ -62,8 +81,8 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
       setIsCameraActive(false);
       setCameraError(
         err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
-          ? 'Camera permission was denied. Please allow camera access in your browser or select an image file.'
-          : 'No physical camera detected or device is busy. You can choose a photo from your files or use a verified test sample.'
+          ? 'Camera permission denied. Please allow camera permissions in your browser or select an image file.'
+          : 'No physical camera detected. You can select an image directly from your device.'
       );
     }
   };
@@ -76,16 +95,6 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
     }
     setIsCameraActive(false);
   };
-
-  // Start camera on mount if in camera tab
-  useEffect(() => {
-    if (activeTab === 'camera' && !capturedPhoto) {
-      startCamera(facingMode);
-    }
-    return () => {
-      stopCamera();
-    };
-  }, [activeTab]);
 
   // Handle shutter snap click
   const handleSnapPhoto = () => {
@@ -105,6 +114,7 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       setCapturedPhoto(dataUrl);
+      setCapturedProvenance('live_camera');
       stopCamera();
       onPhotoCaptured(dataUrl, 'live_camera');
     }
@@ -113,7 +123,15 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
   // Retake photo
   const handleRetake = () => {
     setCapturedPhoto(null);
+    if (onPhotoCleared) onPhotoCleared();
     startCamera(facingMode);
+  };
+
+  // Clear photo
+  const handleClear = () => {
+    setCapturedPhoto(null);
+    stopCamera();
+    if (onPhotoCleared) onPhotoCleared();
   };
 
   // Switch between front and back camera
@@ -123,28 +141,35 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
     startCamera(newMode);
   };
 
-  // Handle file upload from gallery
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload from device
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 1. Try to extract real EXIF GPS if available
+      let exifCoords: { lat: number; lng: number } | undefined = undefined;
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const extracted = getExifGpsCoordinates(arrayBuffer);
+        if (extracted) {
+          exifCoords = extracted;
+        }
+      } catch (exifErr) {
+        console.warn('Could not read EXIF data:', exifErr);
+      }
+
+      // 2. Read as data URL for preview and submission
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
         setCapturedPhoto(dataUrl);
+        setCapturedProvenance('gallery_upload');
         stopCamera();
-        onPhotoCaptured(dataUrl, 'gallery_upload');
+        onPhotoCaptured(dataUrl, 'gallery_upload', exifCoords);
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  // Select realistic preset sample
-  const handleSelectSample = () => {
-    if (defaultSampleUrl) {
-      setCapturedPhoto(defaultSampleUrl);
-      stopCamera();
-      onPhotoCaptured(defaultSampleUrl, 'gallery_upload');
-    }
+    // Reset file input so user can pick same file again if desired
+    e.target.value = '';
   };
 
   return (
@@ -161,90 +186,11 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* Source Selector Tabs */}
-      <div style={{ display: 'flex', background: 'var(--slate-100)', padding: '3px', borderRadius: 'var(--radius-md)' }}>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('camera');
-            setCapturedPhoto(null);
-            startCamera();
-          }}
-          style={{
-            flex: 1,
-            padding: '0.45rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            background: activeTab === 'camera' ? 'var(--white)' : 'transparent',
-            color: activeTab === 'camera' ? 'var(--civic-700)' : 'var(--slate-600)',
-            boxShadow: activeTab === 'camera' ? 'var(--shadow-xs)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '5px'
-          }}
-        >
-          <Camera size={14} /> Live Device Camera
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('upload');
-            stopCamera();
-            fileInputRef.current?.click();
-          }}
-          style={{
-            flex: 1,
-            padding: '0.45rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            background: activeTab === 'upload' ? 'var(--white)' : 'transparent',
-            color: activeTab === 'upload' ? 'var(--civic-700)' : 'var(--slate-600)',
-            boxShadow: activeTab === 'upload' ? 'var(--shadow-xs)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '5px'
-          }}
-        >
-          <Upload size={14} /> Upload Image File
-        </button>
-
-        {defaultSampleUrl && (
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('sample');
-              handleSelectSample();
-            }}
-            style={{
-              flex: 1,
-              padding: '0.45rem',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              background: activeTab === 'sample' ? 'var(--white)' : 'transparent',
-              color: activeTab === 'sample' ? 'var(--civic-700)' : 'var(--slate-600)',
-              boxShadow: activeTab === 'sample' ? 'var(--shadow-xs)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px'
-            }}
-          >
-            <Sparkles size={14} /> Verified Sample
-          </button>
-        )}
-      </div>
-
-      {/* VIEWFINDER / CAPTURED PREVIEW CONTAINER */}
+      {/* VIEWFINDER / CAPTURE VIEWPORT */}
       <div
         style={{
           position: 'relative',
-          height: '270px',
+          height: '290px',
           background: '#070e1b',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
@@ -267,7 +213,7 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
           />
         )}
 
-        {/* 1. STATE: PHOTO ALREADY CAPTURED */}
+        {/* 1. STATE: PHOTO ALREADY CAPTURED (Real user photo) */}
         {capturedPhoto ? (
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             <img
@@ -280,47 +226,106 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
             <div
               style={{
                 position: 'absolute',
-                top: '10px',
-                left: '10px',
-                background: 'rgba(16, 185, 129, 0.9)',
+                top: '12px',
+                left: '12px',
+                background: 'rgba(16, 185, 129, 0.92)',
                 color: '#ffffff',
-                padding: '3px 8px',
+                padding: '4px 10px',
                 borderRadius: 'var(--radius-full)',
-                fontSize: '0.7rem',
-                fontWeight: 700,
+                fontSize: '0.72rem',
+                fontWeight: 800,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                backdropFilter: 'blur(4px)'
+                gap: '5px',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
               }}
             >
-              <CheckCircle2 size={12} />
-              <span>Photo Snapped & Geotagged ✓</span>
+              <CheckCircle2 size={13} />
+              <span>
+                {capturedProvenance === 'live_camera'
+                  ? 'Real-Time Camera Photo Captured ✓'
+                  : 'Photo Uploaded from Device ✓'}
+              </span>
             </div>
 
-            {/* Retake Button Overlay */}
+            {/* Top Right Action: Remove */}
             <button
               type="button"
-              onClick={handleRetake}
+              onClick={handleClear}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'rgba(239, 68, 68, 0.9)',
+                color: '#ffffff',
+                border: 'none',
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+              }}
+              title="Remove Photo"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Bottom Actions: Retake */}
+            <div
               style={{
                 position: 'absolute',
                 bottom: '12px',
                 right: '12px',
-                background: 'rgba(15, 23, 42, 0.85)',
-                color: '#ffffff',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '0.4rem 0.8rem',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.75rem',
-                fontWeight: 700,
                 display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                backdropFilter: 'blur(4px)'
+                gap: '8px'
               }}
             >
-              <RefreshCw size={13} /> Retake Photo
-            </button>
+              <button
+                type="button"
+                onClick={handleRetake}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.88)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backdropFilter: 'blur(4px)',
+                  cursor: 'pointer'
+                }}
+              >
+                <RefreshCw size={13} /> Retake with Camera
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.88)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backdropFilter: 'blur(4px)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Upload size={13} /> Change File
+              </button>
+            </div>
           </div>
         ) : isCameraActive ? (
           /* 2. STATE: LIVE CAMERA STREAM RUNNING */
@@ -338,7 +343,7 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
               style={{
                 position: 'absolute',
                 inset: '20px',
-                border: '1px dashed rgba(255, 255, 255, 0.4)',
+                border: '1px dashed rgba(255, 255, 255, 0.35)',
                 borderRadius: 'var(--radius-md)',
                 pointerEvents: 'none',
                 display: 'flex',
@@ -348,10 +353,10 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
             >
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderTop: '2px solid rgba(255, 255, 255, 0.8)',
-                  borderLeft: '2px solid rgba(255, 255, 255, 0.8)',
+                  width: '28px',
+                  height: '28px',
+                  borderTop: '3px solid #22c55e',
+                  borderLeft: '3px solid #22c55e',
                   position: 'absolute',
                   top: '0',
                   left: '0'
@@ -359,10 +364,10 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
               />
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderTop: '2px solid rgba(255, 255, 255, 0.8)',
-                  borderRight: '2px solid rgba(255, 255, 255, 0.8)',
+                  width: '28px',
+                  height: '28px',
+                  borderTop: '3px solid #22c55e',
+                  borderRight: '3px solid #22c55e',
                   position: 'absolute',
                   top: '0',
                   right: '0'
@@ -370,10 +375,10 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
               />
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderBottom: '2px solid rgba(255, 255, 255, 0.8)',
-                  borderLeft: '2px solid rgba(255, 255, 255, 0.8)',
+                  width: '28px',
+                  height: '28px',
+                  borderBottom: '3px solid #22c55e',
+                  borderLeft: '3px solid #22c55e',
                   position: 'absolute',
                   bottom: '0',
                   left: '0'
@@ -381,69 +386,89 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
               />
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderBottom: '2px solid rgba(255, 255, 255, 0.8)',
-                  borderRight: '2px solid rgba(255, 255, 255, 0.8)',
+                  width: '28px',
+                  height: '28px',
+                  borderBottom: '3px solid #22c55e',
+                  borderRight: '3px solid #22c55e',
                   position: 'absolute',
                   bottom: '0',
                   right: '0'
                 }}
               />
-              <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.72rem', fontWeight: 600 }}>
-                Align {categoryName} in frame
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.74rem', fontWeight: 600, background: 'rgba(0,0,0,0.5)', padding: '2px 8px', borderRadius: '4px' }}>
+                Center {categoryName} in camera
               </div>
             </div>
 
-            {/* Telemetry pill */}
+            {/* Live Camera Active Badge */}
             <div
               style={{
                 position: 'absolute',
-                top: '10px',
-                left: '10px',
-                background: 'rgba(15, 23, 42, 0.8)',
+                top: '12px',
+                left: '12px',
+                background: 'rgba(15, 23, 42, 0.85)',
                 color: '#4ade80',
-                padding: '2px 8px',
+                padding: '3px 8px',
                 borderRadius: 'var(--radius-sm)',
                 fontSize: '0.68rem',
                 fontFamily: 'var(--font-mono)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '5px'
               }}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
-              LIVE 30FPS • GPS LOCKED
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+              LIVE CAMERA ACTIVE
             </div>
 
-            {/* Switch Camera Button (Front/Back) */}
-            <button
-              type="button"
-              onClick={handleToggleFacingMode}
-              style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#ffffff',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="Switch Front/Back Camera"
-            >
-              <SwitchCamera size={15} />
-            </button>
+            {/* Camera Controls (Switch / Cancel) */}
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={handleToggleFacingMode}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Switch Front/Back Camera"
+              >
+                <SwitchCamera size={15} />
+              </button>
 
-            {/* Big Shutter Click Button */}
+              <button
+                type="button"
+                onClick={stopCamera}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Close Camera"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Shutter Button */}
             <div
               style={{
                 position: 'absolute',
-                bottom: '12px',
+                bottom: '14px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 display: 'flex',
@@ -455,23 +480,23 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
                 type="button"
                 onClick={handleSnapPhoto}
                 style={{
-                  width: '56px',
-                  height: '56px',
+                  width: '60px',
+                  height: '60px',
                   borderRadius: '50%',
                   background: '#ffffff',
-                  border: '4px solid rgba(37, 99, 235, 0.8)',
+                  border: '4px solid rgba(37, 99, 235, 0.85)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 0 16px rgba(37, 99, 235, 0.5)',
+                  boxShadow: '0 0 18px rgba(37, 99, 235, 0.6)',
                   cursor: 'pointer'
                 }}
-                title="Click to Snap Picture"
+                title="Click to Capture Photo"
               >
                 <div
                   style={{
-                    width: '42px',
-                    height: '42px',
+                    width: '46px',
+                    height: '46px',
                     borderRadius: '50%',
                     background: 'var(--civic-600)'
                   }}
@@ -480,50 +505,130 @@ export const DeviceCameraCapture: React.FC<DeviceCameraCaptureProps> = ({
             </div>
           </div>
         ) : (
-          /* 3. STATE: CAMERA ERROR / PERMISSION PROMPT */
-          <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--slate-300)', maxWidth: '380px' }}>
-            <AlertTriangle size={32} style={{ color: '#f59e0b', margin: '0 auto 8px' }} />
-            <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '4px' }}>
-              Device Camera Not Accessible
-            </h5>
-            <p style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginBottom: '12px', lineHeight: 1.35 }}>
-              {cameraError || 'Allow camera permission in your browser or select an image directly.'}
-            </p>
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => startCamera()}
+          /* 3. INITIAL UPLOAD SCREEN (Clean & Professional, Zero Fake Images) */
+          <div
+            style={{
+              padding: '1.75rem 1.25rem',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.85rem',
+              width: '100%',
+              maxWidth: '420px'
+            }}
+          >
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                background: 'rgba(37, 99, 235, 0.15)',
+                border: '2px solid rgba(59, 130, 246, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#60a5fa'
+              }}
+            >
+              <Camera size={34} />
+            </div>
+
+            <div>
+              <h5 style={{ fontSize: '1rem', fontWeight: 800, color: '#f8fafc', margin: '0 0 4px 0' }}>
+                Capture or Upload Issue Photo
+              </h5>
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0, lineHeight: 1.4 }}>
+                Take a real picture using your device camera or select a photo file from your device.
+              </p>
+            </div>
+
+            {cameraError && (
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#fca5a5',
+                  fontSize: '0.74rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  textAlign: 'left'
+                }}
               >
-                <Camera size={13} /> Retry Camera
-              </button>
+                <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                <span>{cameraError}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.75rem', width: '100%', marginTop: '0.25rem' }}>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                onClick={() => startCamera(facingMode)}
+                className="btn btn-primary"
+                style={{
+                  flex: 1,
+                  padding: '0.65rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Camera size={16} />
+                <span>Capture Photo</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
+                className="btn btn-secondary"
+                style={{
+                  flex: 1,
+                  padding: '0.65rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
               >
-                <Upload size={13} /> Select File
+                <Upload size={16} />
+                <span>Upload from Device</span>
               </button>
-              {defaultSampleUrl && (
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={handleSelectSample}
-                >
-                  Use Sample
-                </button>
-              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Snap Prompt Instruction */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--slate-500)' }}>
-        <span>📸 <strong>Click the shutter button</strong> to snap live picture from device.</span>
+      {/* Instructions & Help */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.72rem',
+          color: 'var(--slate-500)'
+        }}
+      >
+        <span>
+          {capturedPhoto
+            ? '✓ Evidence attached. Ready for location verification.'
+            : '📸 Click "Capture Photo" to open your device camera, or "Upload from Device" to choose an image.'}
+        </span>
         {capturedPhoto && (
-          <span style={{ color: 'var(--emerald-600)', fontWeight: 700 }}>
-            Photo Ready to Upload ✓
+          <span style={{ color: 'var(--emerald-600)', fontWeight: 800 }}>
+            Photo Ready ✓
           </span>
         )}
       </div>

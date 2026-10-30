@@ -272,8 +272,8 @@ def create_incident(req: IncidentCreateRequest):
     )
 
     dup_prob, dup_candidates, cluster_id = check_duplicate_candidates(
-        new_lat=req.latitude or 28.4632,
-        new_lng=req.longitude or 77.4912,
+        new_lat=req.latitude if req.latitude is not None else 0.0,
+        new_lng=req.longitude if req.longitude is not None else 0.0,
         new_category=req.category,
         new_desc=req.description or "",
         existing_incidents=all_incidents
@@ -285,8 +285,8 @@ def create_incident(req: IncidentCreateRequest):
         is_low_conf = True
         ai_confidence = 54.0
 
-    photo_url = req.beforePhotoUrl or "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80"
-    content_hash = compute_media_sha256(photo_url.encode('utf-8'))[:16]
+    photo_url = req.beforePhotoUrl or ""
+    content_hash = compute_media_sha256(photo_url.encode('utf-8'))[:16] if photo_url else "no-hash"
 
     new_incident = {
         "id": new_id,
@@ -307,12 +307,12 @@ def create_incident(req: IncidentCreateRequest):
             "totalScore": priority_data["totalScore"]
         },
         "location": {
-            "lat": req.latitude or 28.4632,
-            "lng": req.longitude or 77.4912,
+            "lat": req.latitude if req.latitude is not None else 0.0,
+            "lng": req.longitude if req.longitude is not None else 0.0,
             "address": address,
             "ward": ward,
             "landmark": landmark,
-            "hotspotZone": "Greater Noida Transit Belt",
+            "hotspotZone": "Municipal Zone",
             "isPublicSafePrecision": True
         },
         "evidence": {

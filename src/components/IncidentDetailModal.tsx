@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useCivic } from '../context/CivicContext';
 import { CivicIncident, PriorityLevel } from '../types';
 import { BeforeAfterSlider } from './BeforeAfterSlider';
+import { DeviceCameraCapture } from './DeviceCameraCapture';
 import { PriorityScoreExplainer } from './PriorityScoreExplainer';
 import { DuplicateClusterVisualizer } from './DuplicateClusterVisualizer';
 import { getDeadlineCountdown, parseDeadline } from '../utils/deadlines';
@@ -63,10 +64,10 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
   // Worker In-Complaint Completion State (Section 8)
   const [workerAfterPhoto, setWorkerAfterPhoto] = useState<string>(
-    incident?.evidence.afterPhotoUrl || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80'
+    incident?.evidence.afterPhotoUrl || ''
   );
-  const [workerRepairNotes, setWorkerRepairNotes] = useState<string>('Repairs completed to municipal specification.');
-  const [workerMaterials, setWorkerMaterials] = useState<string>('Standard repair squad equipment & materials logged.');
+  const [workerRepairNotes, setWorkerRepairNotes] = useState<string>('');
+  const [workerMaterials, setWorkerMaterials] = useState<string>('');
   const [isSubmittingProof, setIsSubmittingProof] = useState<boolean>(false);
 
   // Citizen Feedback State
@@ -739,34 +740,14 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 <form onSubmit={handleSubmitWorkerCompletion} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--slate-700)', marginBottom: '4px' }}>
-                      Completion Photo Proof (URL or Camera Capture):
+                      Capture or Upload Completion Photo Proof:
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={workerAfterPhoto}
-                      onChange={(e) => setWorkerAfterPhoto(e.target.value)}
-                      placeholder="https://images.unsplash.com/photo-..."
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-300)', fontSize: '0.8rem' }}
+                    <DeviceCameraCapture
+                      initialPhotoUrl={workerAfterPhoto || null}
+                      categoryName={`Repaired ${incident.category}`}
+                      onPhotoCaptured={(capturedDataUrl) => setWorkerAfterPhoto(capturedDataUrl)}
+                      onPhotoCleared={() => setWorkerAfterPhoto('')}
                     />
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setWorkerAfterPhoto('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80')}
-                        className="btn btn-secondary btn-sm"
-                        style={{ fontSize: '0.7rem' }}
-                      >
-                        Use Pothole Repair Sample
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setWorkerAfterPhoto('https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=800&q=80')}
-                        className="btn btn-secondary btn-sm"
-                        style={{ fontSize: '0.7rem' }}
-                      >
-                        Use Sanitation Sample
-                      </button>
-                    </div>
                   </div>
 
                   <div>

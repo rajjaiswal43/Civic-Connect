@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCivic } from '../context/CivicContext';
 import { CivicMap } from './CivicMap';
 import { IncidentCategory, CivicIncident } from '../types';
@@ -39,6 +39,26 @@ export const CitizenHome: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedImpactScore, setSelectedImpactScore] = useState<Record<string, number>>({});
   const [feedbackComment, setFeedbackComment] = useState<Record<string, string>>({});
+  const [userLocality, setUserLocality] = useState<string>('Live Geotagged Portal');
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=12&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.county;
+          const sub = data.address?.suburb || data.address?.neighbourhood;
+          if (city) {
+            setUserLocality(sub ? `${sub}, ${city}` : city);
+          }
+        } catch {}
+      });
+    }
+  }, []);
 
   const categories: { id: string; label: string }[] = [
     { id: 'ALL', label: 'All Issues' },
@@ -103,10 +123,10 @@ export const CitizenHome: React.FC = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd', padding: '3px 10px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(147, 197, 253, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <MapPin size={12} /> Greater Noida, Ward 12 (Knowledge Park III)
+              <MapPin size={12} /> {userLocality}
             </span>
             <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '2px 8px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(52, 211, 153, 0.3)', fontWeight: 600 }}>
-              ✓ Verified OTP User (Raj / Priya)
+              ✓ Verified Citizen Portal
             </span>
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.01em', marginBottom: '4px' }}>
@@ -247,53 +267,61 @@ export const CitizenHome: React.FC = () => {
           </div>
 
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem' }}>
-            {myReports.map((inc) => (
-              <div
-                key={inc.id}
-                onClick={() => setSelectedIncident(inc)}
-                style={{
-                  padding: '0.85rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--slate-200)',
-                  background: 'var(--slate-50)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--civic-500)')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--slate-200)')}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--civic-700)' }}>
-                      #{inc.id}
-                    </span>
-                    <span className={`badge badge-${inc.status.toLowerCase()}`}>
-                      {inc.status.replace('_', ' ')}
-                    </span>
+            {myReports.length === 0 ? (
+              <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--slate-500)', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)' }}>
+                <Clock size={32} style={{ color: 'var(--slate-300)', margin: '0 auto 8px' }} />
+                <h4 style={{ margin: 0, color: 'var(--slate-700)', fontWeight: 700, fontSize: '0.9rem' }}>No Active Reports Yet</h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem' }}>Spot an issue in your locality? Click "Report a Civic Issue" above to capture live photographic evidence.</p>
+              </div>
+            ) : (
+              myReports.map((inc) => (
+                <div
+                  key={inc.id}
+                  onClick={() => setSelectedIncident(inc)}
+                  style={{
+                    padding: '0.85rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--slate-200)',
+                    background: 'var(--slate-50)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--civic-500)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--slate-200)')}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--civic-700)' }}>
+                        #{inc.id}
+                      </span>
+                      <span className={`badge badge-${inc.status.toLowerCase()}`}>
+                        {inc.status.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    {inc.escalationState !== 'NONE' && (
+                      <span className={`badge badge-escalation-${inc.escalationState.toLowerCase()}`}>
+                        ⚠️ {inc.escalationState.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
 
-                  {inc.escalationState !== 'NONE' && (
-                    <span className={`badge badge-escalation-${inc.escalationState.toLowerCase()}`}>
-                      ⚠️ {inc.escalationState.replace('_', ' ')}
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-900)' }}>
+                    {inc.title}
+                  </h4>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--slate-500)', marginTop: '2px' }}>
+                    <span>Dept: <strong>{inc.department}</strong></span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--civic-600)', fontWeight: 600 }}>
+                      Inspect Timeline <ChevronRight size={13} />
                     </span>
-                  )}
+                  </div>
                 </div>
-
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-900)' }}>
-                  {inc.title}
-                </h4>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--slate-500)', marginTop: '2px' }}>
-                  <span>Dept: <strong>{inc.department}</strong></span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--civic-600)', fontWeight: 600 }}>
-                    Inspect Timeline <ChevronRight size={13} />
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -312,7 +340,14 @@ export const CitizenHome: React.FC = () => {
           </div>
 
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem' }}>
-            {incidents.slice(0, 3).map((inc) => (
+            {incidents.length === 0 ? (
+              <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--slate-500)', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)' }}>
+                <ThumbsUp size={32} style={{ color: 'var(--slate-300)', margin: '0 auto 8px' }} />
+                <h4 style={{ margin: 0, color: 'var(--slate-700)', fontWeight: 700, fontSize: '0.9rem' }}>No Active Community Reports</h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem' }}>Issues reported by citizens will appear here for neighborhood validation and impact tracking.</p>
+              </div>
+            ) : (
+              incidents.slice(0, 3).map((inc) => (
               <div
                 key={inc.id}
                 style={{
@@ -408,7 +443,8 @@ export const CitizenHome: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>
@@ -438,6 +474,13 @@ export const CitizenHome: React.FC = () => {
           </span>
         </div>
 
+        {incidents.filter((i) => (i.status === 'RESOLVED' || i.evidence.afterPhotoUrl) && i.status !== 'REJECTED').length === 0 ? (
+          <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--slate-500)', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--slate-300)' }}>
+            <ShieldCheck size={36} style={{ color: 'var(--slate-300)', margin: '0 auto 8px' }} />
+            <h4 style={{ margin: 0, color: 'var(--slate-700)', fontWeight: 700, fontSize: '0.95rem' }}>No Completed Civic Work Yet</h4>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Verified municipal infrastructure repairs closed by citizen ground review will be showcased here.</p>
+          </div>
+        ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
           {incidents
             .filter((i) => (i.status === 'RESOLVED' || i.evidence.afterPhotoUrl) && i.status !== 'REJECTED')
@@ -540,6 +583,7 @@ export const CitizenHome: React.FC = () => {
               </div>
             ))}
         </div>
+        )}
       </div>
     </div>
   );

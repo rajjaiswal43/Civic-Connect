@@ -71,8 +71,13 @@ export const AppContent: React.FC = () => {
     // Initial sync on mount
     handlePopState();
 
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('report') === 'true') {
+      setIsReportModalOpen(true);
+    }
+
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [setActiveTab, setCurrentRole]);
+  }, [setActiveTab, setCurrentRole, setIsReportModalOpen]);
 
   // Handle route protection for /officer/dashboard
   useEffect(() => {

@@ -125,3 +125,4 @@ function readRationals(view: DataView, offset: number, count: number, littleEndi
   }
   return result;
 }
+

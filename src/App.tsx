@@ -49,32 +49,33 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
       setCurrentPath(path);
 
-      if (path === '/officer/login' || path === '/officer/dashboard') {
+      if (tabParam === 'officer' || path === '/officer/login' || path === '/officer/dashboard') {
         setActiveTab('officer');
         setCurrentRole('officer');
-      } else if (path === '/worker') {
+      } else if (tabParam === 'worker' || path === '/worker') {
         setActiveTab('worker');
         setCurrentRole('worker');
-      } else if (path === '/analytics') {
+      } else if (tabParam === 'analytics' || path === '/analytics') {
         setActiveTab('analytics');
-      } else if (path === '/audit') {
+      } else if (tabParam === 'audit' || path === '/audit') {
         setActiveTab('audit');
       } else {
         setActiveTab('citizen');
         setCurrentRole('citizen');
+      }
+
+      if (params.get('report') === 'true') {
+        setIsReportModalOpen(true);
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     // Initial sync on mount
     handlePopState();
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('report') === 'true') {
-      setIsReportModalOpen(true);
-    }
 
     return () => window.removeEventListener('popstate', handlePopState);
   }, [setActiveTab, setCurrentRole, setIsReportModalOpen]);

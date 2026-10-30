@@ -6,7 +6,17 @@ import secrets
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "civic_connect.db")
+if os.environ.get("VERCEL"):
+    import shutil
+    DB_FILE = "/tmp/civic_connect.db"
+    src_db = os.path.join(os.path.dirname(__file__), "civic_connect.db")
+    if os.path.exists(src_db) and not os.path.exists(DB_FILE):
+        try:
+            shutil.copy2(src_db, DB_FILE)
+        except Exception as e:
+            print("Error copying db to /tmp:", e)
+else:
+    DB_FILE = os.path.join(os.path.dirname(__file__), "civic_connect.db")
 
 DEFAULT_OFFICER = {
     "id": "OFF-YK-01",

@@ -34,8 +34,7 @@ export const AppContent: React.FC = () => {
     isOfficerAuthModalOpen,
     setIsOfficerAuthModalOpen,
     isWorkerAuthModalOpen,
-    setIsWorkerAuthModalOpen,
-    isMobileFrameActive
+    setIsWorkerAuthModalOpen
   } = useCivic();
 
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -181,16 +180,7 @@ export const AppContent: React.FC = () => {
 
       {/* Main Content Viewport */}
       <main className="main-content">
-        {isMobileFrameActive ? (
-          <div className="mobile-frame-wrapper">
-            <div className="mobile-notch">
-              <div className="mobile-camera-dot"></div>
-            </div>
-            {renderActiveView()}
-          </div>
-        ) : (
-          renderActiveView()
-        )}
+        {renderActiveView()}
       </main>
 
       {/* Modals & Dialogs */}

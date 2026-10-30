@@ -11,8 +11,6 @@ import {
   Bell,
   MoreVertical,
   Terminal,
-  Smartphone,
-  Monitor,
   RotateCcw,
   LogIn,
   LogOut,
@@ -39,8 +37,6 @@ export const Navbar: React.FC = () => {
     logoutWorker,
     setIsReportModalOpen,
     isBackendOnline,
-    isMobileFrameActive,
-    setIsMobileFrameActive,
     setIsApiExplorerOpen,
     resetToDefaultData
   } = useCivic();
@@ -351,21 +347,6 @@ export const Navbar: React.FC = () => {
                     <div style={{ textAlign: 'left' }}>
                       <span className="tools-item-title">REST API & PostGIS Inspector</span>
                       <p className="tools-item-desc">Execute live FastAPI endpoints & inspect database schema</p>
-                    </div>
-                  </button>
-
-                  {/* Mobile Frame Toggle */}
-                  <button
-                    className="tools-item"
-                    onClick={() => {
-                      setShowToolsMenu(false);
-                      setIsMobileFrameActive(!isMobileFrameActive);
-                    }}
-                  >
-                    {isMobileFrameActive ? <Monitor size={15} style={{ color: '#7c3aed' }} /> : <Smartphone size={15} style={{ color: '#7c3aed' }} />}
-                    <div style={{ textAlign: 'left' }}>
-                      <span className="tools-item-title">{isMobileFrameActive ? 'Switch to Full Desktop View' : 'Preview Smartphone Viewport'}</span>
-                      <p className="tools-item-desc">Test mobile responsive citizen capture interface</p>
                     </div>
                   </button>
 

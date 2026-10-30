@@ -134,39 +134,6 @@ a {
   padding-bottom: 4rem;
 }
 
-/* Mobile Frame Wrapper Simulation */
-.mobile-frame-wrapper {
-  max-width: 440px;
-  margin: 1.5rem auto;
-  border-radius: 40px;
-  border: 12px solid #1e293b;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  background: var(--slate-50);
-  overflow: hidden;
-  position: relative;
-}
-
-.mobile-notch {
-  width: 130px;
-  height: 22px;
-  background: #1e293b;
-  margin: 0 auto 8px;
-  border-bottom-left-radius: 14px;
-  border-bottom-right-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.mobile-camera-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #0f172a;
-  border: 1px solid #334155;
-}
-
 /* ==========================================================================
    HEADER & NAVBAR (Executive Civic-Tech Design)
    ========================================================================== */

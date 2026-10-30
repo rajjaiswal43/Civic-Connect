@@ -298,7 +298,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 3500 }}>
-      <div className="modal-container" style={{ maxWidth: '640px', maxHeight: '92vh', borderRadius: 'var(--radius-xl)' }}>
+      <div className="modal-container" style={{ width: '94%', maxWidth: '680px', maxHeight: '92vh', borderRadius: 'var(--radius-xl)' }}>
         {/* Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

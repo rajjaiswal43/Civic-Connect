@@ -556,7 +556,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {
           id: `log-${Date.now()}`,
           timestamp: formattedDate,
-          actor: 'Citizen (PWA)',
+          actor: 'Citizen (Web Portal)',
           role: 'Citizen',
           action: 'Report Submitted',
           details: `Geotagged report submitted at ${incidentData.location?.address || 'Knowledge Park III'}.`

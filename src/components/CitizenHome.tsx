@@ -20,7 +20,9 @@ import {
   Filter,
   Star,
   Bell,
-  Check
+  Check,
+  Building2,
+  Calendar
 } from 'lucide-react';
 
 export const CitizenHome: React.FC = () => {
@@ -408,6 +410,135 @@ export const CitizenHome: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* -------------------------------------------------------------
+          RECENTLY COMPLETED CIVIC WORK (Section 9)
+         ------------------------------------------------------------- */}
+      <div className="card" style={{ padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={22} style={{ color: '#059669' }} />
+              <h3 className="card-title" style={{ margin: 0, fontSize: '1.15rem', color: 'var(--slate-900)' }}>
+                Recently Completed Civic Work
+              </h3>
+              <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, border: '1px solid #86efac' }}>
+                Officer Verified ✓
+              </span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--slate-500)', margin: '3px 0 0 0' }}>
+              Public showcase of verified field infrastructure repairs inspected by zonal officers and closed by citizen verification.
+            </p>
+          </div>
+
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '4px 10px', borderRadius: 'var(--radius-full)', border: '1px solid #a7f3d0' }}>
+            {incidents.filter((i) => (i.status === 'RESOLVED' || i.evidence.afterPhotoUrl) && i.status !== 'REJECTED').length} Issues Resolved
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+          {incidents
+            .filter((i) => (i.status === 'RESOLVED' || i.evidence.afterPhotoUrl) && i.status !== 'REJECTED')
+            .slice(0, 4)
+            .map((work) => (
+              <div
+                key={work.id}
+                onClick={() => setSelectedIncident(work)}
+                style={{
+                  background: 'var(--slate-50)',
+                  border: '1px solid var(--slate-200)',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.borderColor = '#059669';
+                  e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(5, 150, 105, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--slate-200)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {/* Before / After Split Preview */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', height: '140px', position: 'relative' }}>
+                  <div style={{ position: 'relative', overflow: 'hidden' }}>
+                    <img
+                      src={work.evidence.beforePhotoUrl}
+                      alt="Before"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <span style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '3px' }}>
+                      BEFORE
+                    </span>
+                  </div>
+
+                  <div style={{ position: 'relative', overflow: 'hidden' }}>
+                    <img
+                      src={work.evidence.afterPhotoUrl || work.evidence.beforePhotoUrl}
+                      alt="After"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <span style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(5,150,105,0.85)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '3px' }}>
+                      AFTER
+                    </span>
+                  </div>
+
+                  <div style={{ position: 'absolute', top: '8px', left: '8px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.85)', color: '#fff', padding: '2px 8px', borderRadius: '4px' }}>
+                      #{work.id}
+                    </span>
+                  </div>
+
+                  <div style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 800, background: '#059669', color: '#fff', padding: '2px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <CheckCircle2 size={10} /> Officer Verified
+                    </span>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--civic-700)', textTransform: 'uppercase' }}>
+                        {work.category}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--slate-500)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Clock size={11} /> {work.evidence.photoTimestamp?.split(',')[0] || 'Recently'}
+                      </span>
+                    </div>
+
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-900)', margin: '4px 0 2px 0', lineHeight: 1.3 }}>
+                      {work.title}
+                    </h4>
+
+                    <p style={{ fontSize: '0.74rem', color: 'var(--slate-500)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {work.location.ward || work.location.address}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--slate-200)', paddingTop: '6px', marginTop: '4px', fontSize: '0.72rem' }}>
+                    <span style={{ color: 'var(--slate-600)', fontWeight: 600 }}>
+                      Dept: <strong>{work.department}</strong>
+                    </span>
+                    <span style={{ color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      View Details <ChevronRight size={13} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
         </div>
       </div>
     </div>

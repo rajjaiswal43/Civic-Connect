@@ -1,13 +1,22 @@
 import os
 import json
+import secrets
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, status, Query
+from fastapi import FastAPI, HTTPException, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .models import (
     OfficerProfile,
+    OfficerLoginRequest,
+    OfficerLoginByNameMobileRequest,
+    OfficerChangePasswordRequest,
+    OfficerRegisterRequest,
+    OfficerApproveRequest,
+    OfficerRejectRequest,
+    OfficerRequestInfoRequest,
+    OfficerVerifyCompletionRequest,
     AuthOtpRequest,
     AuthOtpResponse,
     IncidentCreateRequest,
@@ -29,6 +38,9 @@ from .database import (
     get_connection,
     get_officer_profile,
     update_officer_profile,
+    authenticate_officer,
+    change_officer_password,
+    register_officer_db,
     get_all_incidents,
     get_incident_by_id,
     save_incident,
@@ -45,13 +57,13 @@ from .ai_engine import (
 
 app = FastAPI(
     title="Civic Connect API",
-    description="AI-Assisted Public Infrastructure Reporting & Accountability Platform — Mini Project Backend (FastAPI + SQLite/PostGIS)",
-    version="1.4.0",
+    description="AI-Assisted Public Infrastructure Reporting & Accountability Platform — FastAPI + SQLite",
+    version="1.5.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Enable CORS for local dev server
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,6 +71,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def handle_api_prefix(request: Request, call_next):
+    if request.scope["path"].startswith("/api/"):
+        request.scope["path"] = request.scope["path"][4:]
+    elif request.scope["path"] == "/api":
+        request.scope["path"] = "/"
+    response = await call_next(request)
+    return response
 
 # Startup event: Initialize database and seed if empty
 @app.on_event("startup")
@@ -80,7 +101,6 @@ def startup_event():
     init_db(initial_incidents=initial_incidents, workers=workers, hotspots=hotspots)
     print("Database initialized successfully.")
 
-# Helper to format dates
 def get_now_formatted():
     now = datetime.now()
     return f"{now.day} Aug 2026, {now.strftime('%I:%M %p')}"
@@ -93,12 +113,12 @@ def read_root():
         "platform": "CIVIC CONNECT",
         "description": "AI-Powered Civic Complaint Intelligence & Resolution Platform",
         "status": "online",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "api_docs": "/docs",
         "database": "SQLite / PostGIS Schema Compatible"
     }
 
-# 2. POST /auth/otp — Identity verification (Chapter 8)
+# 2. POST /auth/otp — Identity verification for citizens
 @app.post("/auth/otp", response_model=AuthOtpResponse)
 def authenticate_user(req: AuthOtpRequest):
     phone = req.phone.strip()
@@ -111,29 +131,85 @@ def authenticate_user(req: AuthOtpRequest):
         token=f"jwt_civic_{abs(hash(phone)) % 1000000}",
         user_id=f"USR-{abs(hash(phone)) % 9000 + 1000}",
         phone_masked=f"+91 {masked}",
-        role=req.role,
+        role="citizen",
         message="Authentication successful via National SMS Gateway simulation"
     )
 
-# 3. GET /admin/officer — Retrieve active Officer details
+# 3. POST /admin/officer/login — Secure server-side Officer authentication
+@app.post("/admin/officer/login")
+def officer_login_endpoint(req: OfficerLoginRequest):
+    name = (req.name or "").strip()
+    mobile = (req.mobile or "").strip()
+    password = (req.password or "").strip()
+
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required.")
+
+    # Support login with mobile number or fallback to email
+    if not mobile and req.email:
+        # Check if email is yash.kumar or officer.chauhan
+        if "yash" in req.email.lower():
+            mobile = "9761003007"
+            name = name or "Yash Kumar"
+
+    if not mobile:
+        mobile = "9761003007"
+
+    officer = authenticate_officer(name or "Yash Kumar", mobile, password)
+    if not officer:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials. Please verify your Full Name, Mobile Number, and Password."
+        )
+
+    token = f"officer_jwt_{secrets.token_hex(20)}"
+    return {
+        "success": True,
+        "token": token,
+        "officer": officer,
+        "message": f"Welcome, {officer['name']}. Authorized to Officer Command Centre."
+    }
+
+# 4. POST /admin/officer/change-password — Secure Officer password modification
+@app.post("/admin/officer/change-password")
+def change_password_endpoint(req: OfficerChangePasswordRequest):
+    ok, msg = change_officer_password(req.officerId, req.currentPassword, req.newPassword)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"success": True, "message": msg}
+
+# 5. POST /admin/officer/register — Officer account registration (with approval gate)
+@app.post("/admin/officer/register")
+def register_officer_endpoint(req: OfficerRegisterRequest):
+    try:
+        new_officer = register_officer_db(req.dict())
+        return {
+            "success": True,
+            "officer": new_officer,
+            "message": "Officer account registered and approved." if new_officer["isVerified"] else "Account registered. Pending administrative clearance."
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# 6. GET /admin/officer — Retrieve active Officer details
 @app.get("/admin/officer", response_model=OfficerProfile)
 def get_officer():
     profile = get_officer_profile()
     return profile
 
-# 4. PUT /admin/officer — Update Officer details
+# 7. PUT /admin/officer — Update Officer details
 @app.put("/admin/officer", response_model=OfficerProfile)
 def update_officer(req: OfficerProfile):
     updated = update_officer_profile(req.dict())
     return updated
 
-# 5. GET /workers — List available field workers
+# 8. GET /workers — List available field workers
 @app.get("/workers")
 def list_workers():
     workers = get_all_workers()
     return workers
 
-# 6. GET /incidents — List public and officer incidents with filters (Chapter 8)
+# 9. GET /incidents — List public and officer incidents with filters
 @app.get("/incidents")
 def list_incidents(
     category: Optional[str] = Query(None, description="Category filter"),
@@ -166,7 +242,7 @@ def list_incidents(
 
     return filtered
 
-# 7. GET /incidents/{id} — Read incident details and timeline (Chapter 8)
+# 10. GET /incidents/{id} — Read incident details
 @app.get("/incidents/{incident_id}")
 def get_incident(incident_id: str):
     inc = get_incident_by_id(incident_id)
@@ -174,14 +250,13 @@ def get_incident(incident_id: str):
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
     return inc
 
-# 8. POST /incidents — Create a new report (Chapter 8)
+# 11. POST /incidents — Create a new report
 @app.post("/incidents", status_code=status.HTTP_201_CREATED)
 def create_incident(req: IncidentCreateRequest):
     all_incidents = get_all_incidents()
     new_id = f"CC-{1040 + len(all_incidents) + 1}"
     now_str = get_now_formatted()
 
-    # Run AI 6-factor Explainable Priority calculation
     ward = req.ward or "Ward 12"
     address = req.address or f"{ward}, Greater Noida"
     landmark = req.landmark or "Near Central Commercial Belt"
@@ -189,25 +264,24 @@ def create_incident(req: IncidentCreateRequest):
 
     priority_data = calculate_priority_score(
         category=req.category,
-        description=req.description,
+        description=req.description or "Civic infrastructure issue reported.",
         ward=ward,
         address=address,
         confirmations_count=1,
         avg_impact_rating=4.5
     )
 
-    # Run Real Duplicate Detection algorithm
     dup_prob, dup_candidates, cluster_id = check_duplicate_candidates(
-        new_lat=req.latitude,
-        new_lng=req.longitude,
+        new_lat=req.latitude or 28.4632,
+        new_lng=req.longitude or 77.4912,
         new_category=req.category,
-        new_desc=req.description,
+        new_desc=req.description or "",
         existing_incidents=all_incidents
     )
 
     is_low_conf = False
     ai_confidence = 94.0
-    if len(req.description.strip()) < 10:
+    if len((req.description or "").strip()) < 10:
         is_low_conf = True
         ai_confidence = 54.0
 
@@ -217,9 +291,9 @@ def create_incident(req: IncidentCreateRequest):
     new_incident = {
         "id": new_id,
         "title": f"Reported {req.category}: {landmark}",
-        "description": req.description,
+        "description": req.description or f"Civic issue reported in {ward}.",
         "category": req.category,
-        "status": "VERIFIED",
+        "status": "UNDER_REVIEW", # Newly reported issues appear under Under Review
         "escalationState": "NEEDS_REVIEW" if is_low_conf else "NONE",
         "priorityLevel": priority_data["priorityLevel"],
         "priorityScore": priority_data["totalScore"],
@@ -233,8 +307,8 @@ def create_incident(req: IncidentCreateRequest):
             "totalScore": priority_data["totalScore"]
         },
         "location": {
-            "lat": req.latitude,
-            "lng": req.longitude,
+            "lat": req.latitude or 28.4632,
+            "lng": req.longitude or 77.4912,
             "address": address,
             "ward": ward,
             "landmark": landmark,
@@ -277,7 +351,7 @@ def create_incident(req: IncidentCreateRequest):
         "averageImpactRating": 4.5,
         "validationsList": [],
         "department": dept,
-        "slaHoursRemaining": 12,
+        "slaHoursRemaining": 24,
         "isSlaAtRisk": False,
         "createdAt": now_str,
         "updatedAt": now_str,
@@ -285,18 +359,18 @@ def create_incident(req: IncidentCreateRequest):
             {
                 "id": f"log-{int(datetime.now().timestamp() * 1000)}",
                 "timestamp": now_str,
-                "actor": "Citizen (PWA)",
+                "actor": f"Citizen ({req.citizenName or 'Reporter'})",
                 "role": "Citizen",
                 "action": "Report Submitted",
-                "details": f"Report created at {address} with GPS geotag and live provenance."
+                "details": f"Report submitted at {address} with GPS geotag and live photographic proof."
             },
             {
                 "id": f"log-{int(datetime.now().timestamp() * 1000) + 1}",
                 "timestamp": now_str,
                 "actor": "AI Vision Pipeline",
                 "role": "AI System (v1.4b)",
-                "action": "AI Verification & Duplicate Cluster Detected",
-                "details": f"Category verified ({ai_confidence}% confidence). {len(dup_candidates)} nearby reports clustered.",
+                "action": "Issue Categorized & Routed",
+                "details": f"Detected category '{req.category}' ({ai_confidence}% confidence). Routed to {dept}.",
                 "modelVersion": "CivicVision-v1.4b",
                 "confidence": ai_confidence
             }
@@ -306,51 +380,336 @@ def create_incident(req: IncidentCreateRequest):
     saved = save_incident(new_incident)
     return saved
 
-# 9. POST /incidents/{id}/media — Attach before or after evidence media (Chapter 8)
-@app.post("/incidents/{incident_id}/media")
-def attach_media(incident_id: str, req: IncidentMediaRequest):
+# 12. POST /admin/incidents/{id}/approve — Officer approves valid complaint
+@app.post("/admin/incidents/{incident_id}/approve")
+def approve_incident_api(incident_id: str, req: Optional[OfficerApproveRequest] = None):
     inc = get_incident_by_id(incident_id)
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
 
+    officer = get_officer_profile()
     now_str = get_now_formatted()
-    sha256 = compute_media_sha256(req.photoUrl.encode('utf-8'))[:16]
 
-    if req.photoType == "after":
-        inc["evidence"]["afterPhotoUrl"] = req.photoUrl
-        inc["status"] = "WORK_COMPLETED"
-    else:
-        inc["evidence"]["beforePhotoUrl"] = req.photoUrl
+    inc["status"] = "APPROVED"
+    if req and req.overrideCategory:
+        inc["category"] = req.overrideCategory
+    if req and req.overrideDepartment:
+        inc["department"] = req.overrideDepartment
+    if req and req.officerNotes:
+        inc["officerNotes"] = req.officerNotes
+
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
 
     inc["updatedAt"] = now_str
     inc["auditLogs"].insert(0, {
         "id": f"log-{int(datetime.now().timestamp() * 1000)}",
         "timestamp": now_str,
-        "actor": "Field Technician" if req.photoType == "after" else "Citizen",
-        "role": "Field Worker" if req.photoType == "after" else "Citizen",
-        "action": f"{req.photoType.title()} Media Attached",
-        "details": f"{req.photoType.title()} photograph verified with SHA-256 hash {sha256}."
+        "actor": f"{officer_name} ({badge})",
+        "role": "Municipal Officer",
+        "action": "Complaint Approved",
+        "details": f"Complaint officially approved by Officer {officer_name}. Eligible for field worker assignment."
     })
 
     save_incident(inc)
-    return {"success": True, "incidentId": incident_id, "sha256": sha256}
+    return {"success": True, "incident": inc}
 
-# 10. POST /incidents/{id}/verify — Run or retrieve AI verification (Chapter 8)
-@app.post("/incidents/{incident_id}/verify")
-def verify_incident(incident_id: str):
+# 13. POST /admin/incidents/{id}/reject — Officer rejects invalid or duplicate complaint
+@app.post("/admin/incidents/{incident_id}/reject")
+def reject_incident_api(incident_id: str, req: OfficerRejectRequest):
     inc = get_incident_by_id(incident_id)
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
 
-    return {
-        "incident_id": incident_id,
-        "aiMetadata": inc.get("aiMetadata"),
-        "priorityScore": inc.get("priorityScore"),
-        "priorityBreakdown": inc.get("priorityBreakdown"),
-        "linkedDuplicatesCount": len(inc.get("linkedReports", []))
-    }
+    if not req.rejectionReason or not req.rejectionReason.strip():
+        raise HTTPException(status_code=400, detail="Rejection reason is mandatory.")
 
-# 11. POST /incidents/{id}/validate — Submit citizen validation (Chapter 8)
+    officer = get_officer_profile()
+    now_str = get_now_formatted()
+
+    inc["status"] = "REJECTED"
+    inc["escalationState"] = "REJECTED"
+    inc["rejectionReason"] = req.rejectionReason.strip()
+    inc["updatedAt"] = now_str
+
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
+
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"{officer_name} ({badge})",
+        "role": "Municipal Officer",
+        "action": "Complaint Rejected",
+        "details": f"Report officially rejected. Ground reason: \"{req.rejectionReason.strip()}\"."
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 14. POST /admin/incidents/{id}/request-info — Request additional information
+@app.post("/admin/incidents/{incident_id}/request-info")
+def request_more_info_api(incident_id: str, req: OfficerRequestInfoRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    officer = get_officer_profile()
+    now_str = get_now_formatted()
+
+    inc["status"] = "MORE_INFO_REQUIRED"
+    inc["moreInfoNotes"] = req.requestNotes.strip()
+    inc["updatedAt"] = now_str
+
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
+
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"{officer_name} ({badge})",
+        "role": "Municipal Officer",
+        "action": "Additional Information Requested",
+        "details": f"Officer requested clarification: \"{req.requestNotes.strip()}\"."
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 15. POST /admin/incidents/{id}/assign — Assign worker and set completion deadline
+@app.post("/admin/incidents/{incident_id}/assign")
+def assign_incident_api(incident_id: str, req: AssignRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    workers = get_all_workers()
+    assigned_worker = next((w for w in workers if w["id"] == req.workerId), workers[0] if workers else None)
+
+    officer = get_officer_profile()
+    now_str = get_now_formatted()
+
+    inc["status"] = "ASSIGNED"
+    inc["deadline"] = req.deadline
+    inc["assignedWorker"] = assigned_worker
+    inc["slaHoursRemaining"] = 24
+    if req.notes:
+        inc["officerNotes"] = req.notes
+
+    worker_name = assigned_worker.get("name", "Field Crew") if assigned_worker else "Field Crew"
+    worker_team = assigned_worker.get("team", "") if assigned_worker else ""
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
+
+    inc["updatedAt"] = now_str
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"{officer_name} ({badge})",
+        "role": "Municipal Officer",
+        "action": "Work Order Assigned",
+        "details": f"Assigned to {worker_name} ({worker_team}). Target Deadline: {req.deadline}."
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 16. POST /admin/incidents/{id}/extend-deadline — Extend completion deadline
+@app.post("/admin/incidents/{incident_id}/extend-deadline")
+def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    officer = get_officer_profile()
+    now_str = get_now_formatted()
+    prev_deadline = inc.get("deadline", "Initial Deadline")
+
+    inc["deadline"] = req.newDeadline
+    if "deadlineExtensions" not in inc or not isinstance(inc["deadlineExtensions"], list):
+        inc["deadlineExtensions"] = []
+
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
+
+    inc["deadlineExtensions"].append({
+        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
+        "previousDeadline": prev_deadline,
+        "newDeadline": req.newDeadline,
+        "reason": req.reason,
+        "extendedBy": f"{officer_name} ({badge})",
+        "timestamp": now_str
+    })
+
+    inc["updatedAt"] = now_str
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"{officer_name} ({badge})",
+        "role": "Municipal Officer",
+        "action": "Statutory Deadline Extended",
+        "details": f"Deadline extended from {prev_deadline} to {req.newDeadline}. Reason: {req.reason}"
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 17. PATCH /worker/incidents/{id}/status — Worker updates status (e.g. WORK_STARTED)
+@app.patch("/worker/incidents/{incident_id}/status")
+def update_worker_status(incident_id: str, req: WorkerStatusRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    now_str = get_now_formatted()
+    new_status = req.status
+    if new_status == "IN_PROGRESS":
+        new_status = "WORK_STARTED"
+
+    inc["status"] = new_status
+    if req.notes:
+        inc["workerNotes"] = req.notes
+
+    worker_name = inc.get("assignedWorker", {}).get("name", "Field Technician")
+    inc["updatedAt"] = now_str
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"Field Worker ({worker_name})",
+        "role": "Field Worker",
+        "action": "Work Started On-Site" if new_status == "WORK_STARTED" else "Task Status Updated",
+        "details": req.notes or "Technician checked in on-site. Field repair work commenced."
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 18. POST /worker/incidents/{id}/completion — Worker uploads repair proof and submits for verification
+@app.post("/worker/incidents/{incident_id}/completion")
+def submit_completion(incident_id: str, req: WorkerCompletionRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    now_str = get_now_formatted()
+    inc["status"] = "WORK_COMPLETED"
+    inc["evidence"]["afterPhotoUrl"] = req.afterPhotoUrl
+    if req.workerNotes:
+        inc["workerNotes"] = req.workerNotes
+    if req.materialsLogged:
+        inc["materialsLogged"] = req.materialsLogged
+
+    worker_name = inc.get("assignedWorker", {}).get("name", "Field Worker")
+    inc["updatedAt"] = now_str
+    inc["auditLogs"].insert(0, {
+        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+        "timestamp": now_str,
+        "actor": f"Field Worker ({worker_name})",
+        "role": "Field Worker",
+        "action": "Completion Evidence Submitted",
+        "details": f"Completion photo uploaded with repair details. Awaiting Officer quality review. Notes: \"{req.workerNotes or 'Completed'}\""
+    })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 19. POST /admin/incidents/{id}/verify-completion — Officer verifies completed work
+@app.post("/admin/incidents/{incident_id}/verify-completion")
+def verify_completed_work_api(incident_id: str, req: OfficerVerifyCompletionRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    officer = get_officer_profile()
+    now_str = get_now_formatted()
+    officer_name = officer.get("name", "Yash Kumar")
+    badge = officer.get("badge_number", "GNIDA-EO-9761")
+
+    if req.action == "approve":
+        inc["status"] = "AWAITING_CITIZEN_FEEDBACK" # Officer verified, ready for citizen confirmation
+        inc["updatedAt"] = now_str
+        inc["auditLogs"].insert(0, {
+            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+            "timestamp": now_str,
+            "actor": f"{officer_name} ({badge})",
+            "role": "Municipal Officer",
+            "action": "Officer Verified Completed Work",
+            "details": f"Work verified by {officer_name}. Before/after proof approved for public transparency. Sent to citizen for final feedback."
+        })
+    else: # reject or request rework
+        inc["status"] = "WORK_STARTED"
+        inc["escalationState"] = "REOPENED"
+        inc["officerNotes"] = f"Rework Required: {req.notes or 'Quality standards not satisfied. Additional work ordered.'}"
+        inc["updatedAt"] = now_str
+        inc["auditLogs"].insert(0, {
+            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+            "timestamp": now_str,
+            "actor": f"{officer_name} ({badge})",
+            "role": "Municipal Officer",
+            "action": "Completion Evidence Rejected / Rework Ordered",
+            "details": f"Officer ordered rework: {req.notes or 'Deficiencies noted in ground repair.'}"
+        })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 20. POST /incidents/{id}/closure-feedback — Citizen gives feedback, automatically resolving complaint if satisfied
+@app.post("/incidents/{incident_id}/closure-feedback")
+def citizen_closure_feedback(incident_id: str, req: ClosureFeedbackRequest):
+    inc = get_incident_by_id(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    now_str = get_now_formatted()
+
+    if req.isSatisfied:
+        inc["status"] = "RESOLVED"
+        inc["escalationState"] = "NONE"
+        inc["slaHoursRemaining"] = 0
+        inc["progressPercent"] = 100
+        inc["userVote"] = "resolved"
+        inc["citizenFeedback"] = {
+            "isSatisfied": True,
+            "rating": req.rating,
+            "comment": req.feedbackNotes or "Citizen confirmed fully resolved.",
+            "submittedAt": now_str
+        }
+        inc["updatedAt"] = now_str
+        inc["auditLogs"].insert(0, {
+            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+            "timestamp": now_str,
+            "actor": "Citizen (Reporter)",
+            "role": "Citizen",
+            "action": "Citizen Final Feedback & Resolution Confirmed",
+            "details": f"Citizen confirmed fully resolved ({req.rating}★). Feedback: \"{req.feedbackNotes or 'Problem solved on ground. Thank you!'}\""
+        })
+    else:
+        inc["status"] = "REOPENED"
+        inc["escalationState"] = "REOPENED"
+        inc["reopenReason"] = req.feedbackNotes or "Citizen reported issue partially or not resolved."
+        inc["priorityLevel"] = "CRITICAL"
+        inc["priorityScore"] = 95.0
+        inc["isSlaAtRisk"] = True
+        inc["citizenFeedback"] = {
+            "isSatisfied": False,
+            "rating": req.rating,
+            "comment": req.feedbackNotes or "Issue unresolved on the ground.",
+            "submittedAt": now_str
+        }
+        inc["updatedAt"] = now_str
+        inc["auditLogs"].insert(0, {
+            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
+            "timestamp": now_str,
+            "actor": "Citizen (Reporter)",
+            "role": "Citizen",
+            "action": "Citizen Disputed Work / Complaint Reopened",
+            "details": f"Citizen indicated not resolved ({req.rating}★). Reason: \"{req.feedbackNotes or 'Unresolved'}\". Re-routed for urgent rework."
+        })
+
+    save_incident(inc)
+    return {"success": True, "incident": inc}
+
+# 21. POST /incidents/{id}/validate — Citizen community impact validation
 @app.post("/incidents/{incident_id}/validate")
 def validate_incident(incident_id: str, req: ValidationRequest):
     inc = get_incident_by_id(incident_id)
@@ -374,623 +733,54 @@ def validate_incident(incident_id: str, req: ValidationRequest):
     }
 
     inc.setdefault("validationsList", []).insert(0, val_entry)
-
-    # Recalculate average impact
     all_ratings = [v["impactRating"] for v in inc["validationsList"] if v.get("impactRating", 0) > 0]
     if all_ratings:
         inc["averageImpactRating"] = round(sum(all_ratings) / len(all_ratings), 1)
 
-    # Audit log
     inc["updatedAt"] = now_str
     inc["auditLogs"].insert(0, {
         "id": f"log-{int(datetime.now().timestamp() * 1000)}",
         "timestamp": now_str,
         "actor": "Citizen (Community)",
         "role": "Community",
-        "action": "Community Issue Corroborated" if req.action == "confirmed_exists" else "Issue Reported Not Present / Wrong Location",
-        "details": f"Citizen voted: {req.action}. Impact rating: {req.impactRating}/5. Note: \"{req.comment or 'No comment'}\""
+        "action": "Community Issue Corroborated" if req.action == "confirmed_exists" else "Issue Flagged Not Present",
+        "details": f"Citizen voted {req.action}. Impact rating: {req.impactRating}/5. Note: \"{req.comment or 'Corroborated'}\""
     })
 
     save_incident(inc)
     return {"success": True, "incident": inc}
 
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 12. POST /admin/incidents/{id}/acknowledge — Official acknowledgement (Chapter 8)
-@app.post("/admin/incidents/{incident_id}/acknowledge")
-def acknowledge_incident_api(incident_id: str, req: AcknowledgeRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-
-    inc["status"] = "ACKNOWLEDGED"
-    inc["deadline"] = req.deadline
-    if req.officerNotes:
-        inc["officerNotes"] = req.officerNotes
-    if req.overrideDepartment:
-        inc["department"] = req.overrideDepartment
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Official Municipal Acknowledged",
-        "details": f"Acknowledged by {officer.get('zone', 'Zone 1')}. Published SLA resolution deadline: {req.deadline}."
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 13. POST /admin/incidents/{id}/assign — Assign worker & deadline (Chapter 8)
-@app.post("/admin/incidents/{incident_id}/assign")
-def assign_incident_api(incident_id: str, req: AssignRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    workers = get_all_workers()
-    assigned_worker = next((w for w in workers if w["id"] == req.workerId), workers[0] if workers else None)
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-
-    inc["status"] = "ASSIGNED"
-    inc["deadline"] = req.deadline
-    inc["assignedWorker"] = assigned_worker
-    inc["slaHoursRemaining"] = 6
-    if req.notes:
-        inc["officerNotes"] = req.notes
-
-    worker_name = assigned_worker.get("name", "Field Crew") if assigned_worker else "Field Crew"
-    worker_team = assigned_worker.get("team", "") if assigned_worker else ""
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Work Order Dispatched",
-        "details": f"Assigned to {worker_name} ({worker_team}). Deadline set to {req.deadline}. Instructions: {req.notes or 'Standard SOP repair'}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 14. POST /admin/incidents/{id}/override — Manual officer override
-@app.post("/admin/incidents/{incident_id}/override")
-def override_incident_ai(incident_id: str, req: OverrideAiRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-
-    if req.category:
-        inc["category"] = req.category
-    if req.priorityLevel:
-        inc["priorityLevel"] = req.priorityLevel
-    if req.priorityScore is not None:
-        inc["priorityScore"] = req.priorityScore
-    if req.department:
-        inc["department"] = req.department
-
-    inc["status"] = "ACKNOWLEDGED"
-    inc["officerNotes"] = f"Override Reason: {req.reason}"
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Officer Manual Override",
-        "details": f"Override applied. Reason: \"{req.reason}\". New Priority: {inc['priorityLevel']}, Dept: {inc['department']}."
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 15. PATCH /worker/incidents/{id}/status — Update work status (Chapter 8)
-@app.patch("/worker/incidents/{incident_id}/status")
-def update_worker_status(incident_id: str, req: WorkerStatusRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    now_str = get_now_formatted()
-    inc["status"] = req.status
-    if req.notes:
-        inc["workerNotes"] = req.notes
-
-    worker_name = inc.get("assignedWorker", {}).get("name", "Field Worker")
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"Field Worker ({worker_name})",
-        "role": "Field Worker",
-        "action": "Repair Started On-Site" if req.status == "IN_PROGRESS" else "Task Status Updated",
-        "details": req.notes or "Technician checked in at GPS coordinates. Site safety barriers erected."
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 16. POST /worker/incidents/{id}/completion — Submit completion proof (Chapter 8)
-@app.post("/worker/incidents/{incident_id}/completion")
-def submit_completion(incident_id: str, req: WorkerCompletionRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    now_str = get_now_formatted()
-    inc["status"] = "WORK_COMPLETED"
-    inc["evidence"]["afterPhotoUrl"] = req.afterPhotoUrl
-    if req.workerNotes:
-        inc["workerNotes"] = req.workerNotes
-    if req.materialsLogged:
-        inc["materialsLogged"] = req.materialsLogged
-
-    worker_name = inc.get("assignedWorker", {}).get("name", "Field Worker")
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"Field Worker ({worker_name})",
-        "role": "Field Worker",
-        "action": "Completion Proof Uploaded",
-        "details": f"After-photo captured with geotag and timestamp. Notes: \"{req.workerNotes or 'Repair completed'}\" Materials: {req.materialsLogged or 'Standard mix'}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 17. POST /incidents/{id}/closure-feedback — Citizen closure review (Chapter 8)
-@app.post("/incidents/{incident_id}/closure-feedback")
-def citizen_closure_feedback(incident_id: str, req: ClosureFeedbackRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    now_str = get_now_formatted()
-
-    if req.isSatisfied:
-        inc["status"] = "RESOLVED"
-        inc["escalationState"] = "NONE"
-        inc["slaHoursRemaining"] = 0
-        inc["userVote"] = "resolved"
-        inc["updatedAt"] = now_str
-        inc["auditLogs"].insert(0, {
-            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-            "timestamp": now_str,
-            "actor": "Citizen (Priya S.)",
-            "role": "Citizen",
-            "action": "Citizen Final Verification Passed",
-            "details": f"Citizen confirmed satisfactory repair. Feedback: \"{req.feedbackNotes or 'Pothole completely leveled. Thank you for prompt action!'}\""
-        })
-    else:
-        inc["status"] = "IN_PROGRESS"
-        inc["escalationState"] = "REOPENED"
-        inc["reopenReason"] = req.feedbackNotes or "Citizen reported incomplete/substandard patch."
-        inc["priorityLevel"] = "CRITICAL"
-        inc["priorityScore"] = 95.0
-        inc["slaHoursRemaining"] = 4
-        inc["isSlaAtRisk"] = True
-        inc["updatedAt"] = now_str
-        inc["auditLogs"].insert(0, {
-            "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-            "timestamp": now_str,
-            "actor": "Citizen (Priya S.)",
-            "role": "Citizen",
-            "action": "Incident Reopened / Dispute Raised",
-            "details": f"Dispute raised: \"{inc['reopenReason']}\". Re-routed for urgent rework."
-        })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 18. POST /admin/incidents/{id}/reopen — Admin reopen (Chapter 8)
-@app.post("/admin/incidents/{incident_id}/reopen")
-def admin_reopen_incident(incident_id: str, req: ReopenRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-
-    inc["status"] = "IN_PROGRESS"
-    inc["escalationState"] = "REOPENED"
-    inc["reopenReason"] = req.reason
-    inc["priorityLevel"] = "CRITICAL"
-    inc["priorityScore"] = 95.0
-    inc["slaHoursRemaining"] = 4
-    inc["isSlaAtRisk"] = True
-    inc["updatedAt"] = now_str
-
-    actor_name = f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})" if req.actorRole == "Municipal Officer" else "Citizen (Dispute)"
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": actor_name,
-        "role": req.actorRole,
-        "action": "Incident Reopened / Dispute Raised",
-        "details": f"Reopened. Reason: \"{req.reason}\". Escalated to priority department review."
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# POST /admin/incidents/{incident_id}/extend-deadline — Extend completion deadline
-@app.post("/admin/incidents/{incident_id}/extend-deadline")
-def extend_incident_deadline(incident_id: str, req: ExtendDeadlineRequest):
-    inc = get_incident_by_id(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-
-    officer = get_officer_profile()
-    now_str = get_now_formatted()
-    prev_deadline = inc.get("deadline", "Initial Deadline")
-
-    inc["deadline"] = req.newDeadline
-    if "deadlineExtensions" not in inc:
-        inc["deadlineExtensions"] = []
-
-    inc["deadlineExtensions"].append({
-        "id": f"ext-{int(datetime.now().timestamp() * 1000)}",
-        "previousDeadline": prev_deadline,
-        "newDeadline": req.newDeadline,
-        "reason": req.reason,
-        "extendedBy": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "timestamp": now_str
-    })
-
-    inc["updatedAt"] = now_str
-    inc["auditLogs"].insert(0, {
-        "id": f"log-{int(datetime.now().timestamp() * 1000)}",
-        "timestamp": now_str,
-        "actor": f"{officer.get('name', 'Er. R. B. Chauhan')} ({officer.get('badge_number', 'GNIDA-EE-2024-042')})",
-        "role": "Municipal Officer",
-        "action": "Statutory Deadline Extended",
-        "details": f"Deadline revised from {prev_deadline} to {req.newDeadline}. Official reason: {req.reason}"
-    })
-
-    save_incident(inc)
-    return {"success": True, "incident": inc}
-
-# 19. GET /analytics/hotspots — Hotspot summaries (Chapter 8)
+# 22. GET /analytics/hotspots — Hotspot summaries
 @app.get("/analytics/hotspots", response_model=List[HotspotSummary])
 def get_hotspot_analytics():
     hotspots = get_all_hotspots()
     return hotspots
 
-# 20. GET /analytics/summary — Citywide KPI statistics
+# 23. GET /analytics/summary — Citywide KPI statistics
 @app.get("/analytics/summary")
 def get_analytics_summary():
     incidents = get_all_incidents()
     total = len(incidents)
     resolved = len([i for i in incidents if i.get("status") == "RESOLVED"])
-    in_progress = len([i for i in incidents if i.get("status") in ["IN_PROGRESS", "ASSIGNED"]])
-    pending = len([i for i in incidents if i.get("status") in ["SUBMITTED", "AI_CHECK", "VERIFIED", "PUBLIC"]])
+    in_progress = len([i for i in incidents if i.get("status") in ["WORK_STARTED", "ASSIGNED", "IN_PROGRESS"]])
+    pending = len([i for i in incidents if i.get("status") in ["SUBMITTED", "UNDER_REVIEW", "AI_CHECK"]])
+    awaiting_verify = len([i for i in incidents if i.get("status") in ["WORK_COMPLETED", "OFFICER_VERIFICATION"]])
     high_priority = len([i for i in incidents if i.get("priorityLevel") in ["HIGH", "CRITICAL"]])
-    sla_risk = len([i for i in incidents if i.get("isSlaAtRisk") or i.get("escalationState") == "OVERDUE"])
 
     return {
-        "totalIncidents": total + 120,
+        "totalIncidents": total,
         "activeCount": len(incidents),
-        "resolvedCount": resolved + 65,
-        "inProgressCount": in_progress + 30,
-        "pendingCount": pending + 7,
-        "highPriorityCount": high_priority + 15,
-        "slaRiskCount": sla_risk + 6,
+        "resolvedCount": resolved,
+        "inProgressCount": in_progress,
+        "pendingCount": pending,
+        "awaitingVerificationCount": awaiting_verify,
+        "highPriorityCount": high_priority,
         "averageResolutionHours": 18.4,
         "duplicateClusteringSavingsPercent": 34.2,
-        "aiAccuracyPercent": 93.8
+        "aiAccuracyPercent": 94.0
     }
 
-# 21. POST /admin/reset — Reset database to initial seed data
+# 24. POST /admin/reset — Reset database to initial municipal seed dataset
 @app.post("/admin/reset")
 def reset_database():
     seed_file = os.path.join(os.path.dirname(__file__), "seed_data.json")
@@ -1002,5 +792,4 @@ def reset_database():
                 workers=data.get("workers", []),
                 hotspots=data.get("hotspots", [])
             )
-    return {"success": True, "message": "Database successfully reset to initial municipal seed dataset."}
-
+    return {"success": True, "message": "Database reset to initial municipal seed dataset."}

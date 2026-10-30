@@ -225,8 +225,38 @@ class OfficerRegisterRequest(BaseModel):
     autoApprove: bool = True
 
 class OfficerLoginRequest(BaseModel):
-    email: str
+    name: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
     password: str
+    rememberMe: Optional[bool] = False
+
+class OfficerLoginByNameMobileRequest(BaseModel):
+    name: str
+    mobile: str
+    password: str
+    rememberMe: Optional[bool] = False
+
+class OfficerChangePasswordRequest(BaseModel):
+    officerId: str
+    currentPassword: str
+    newPassword: str
+
+class OfficerApproveRequest(BaseModel):
+    officerNotes: Optional[str] = "Approved after municipal field verification."
+    overrideCategory: Optional[str] = None
+    overrideDepartment: Optional[str] = None
+
+class OfficerRejectRequest(BaseModel):
+    rejectionReason: str
+
+class OfficerRequestInfoRequest(BaseModel):
+    requestNotes: str
+
+class OfficerVerifyCompletionRequest(BaseModel):
+    action: Literal['approve', 'reject', 'request_rework'] = 'approve'
+    notes: Optional[str] = None
+    isPublicSafe: Optional[bool] = True
 
 class CreateIncidentRequest(BaseModel):
     title: Optional[str] = None

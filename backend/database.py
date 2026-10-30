@@ -1,31 +1,42 @@
 import sqlite3
 import json
 import os
-from typing import List, Dict, Any, Optional
+import hashlib
+import secrets
+from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
 
 DB_FILE = os.path.join(os.path.dirname(__file__), "civic_connect.db")
 
 DEFAULT_OFFICER = {
-    "id": "OFF-402",
-    "name": "Er. R. B. Chauhan",
-    "designation": "Executive Engineer (Civil) & Zonal Officer",
-    "badge_number": "GNIDA-EE-2024-042",
-    "department": "Public Works & Urban Infrastructure Division",
-    "zone": "Zone 1 (Wards 1–15), Greater Noida",
-    "phone": "+91 120 232-6000",
-    "email": "officer.chauhan@gnida.in",
-    "office_address": "GNIDA Administrative Complex, Sector Gamma-II, Greater Noida, UP - 201308",
+    "id": "OFF-YK-01",
+    "name": "Yash Kumar",
+    "designation": "Zonal Executive Officer & Infrastructure Superintendent",
+    "badge_number": "GNIDA-EO-9761",
+    "department": "Roads & Public Works Department",
+    "zone": "Central City Zone (Wards 12, 14 & 15)",
+    "phone": "+91 9761003007",
+    "email": "yash.kumar@pwd.delhi.gov.in",
+    "mobile": "9761003007",
+    "office_address": "Municipal Zonal Headquarters, Sector Knowledge Park III, Greater Noida, UP - 201310",
     "jurisdiction_wards": [
-        "Ward 1 (Alpha I & II)",
-        "Ward 2 (Beta I & II)",
-        "Ward 3 (Gamma I & II)",
-        "Ward 4 (Delta I & II)",
         "Ward 12 (Knowledge Park III)",
-        "Ward 14 (Pari Chowk Junction)"
+        "Ward 14 (Pari Chowk Junction)",
+        "Ward 15 (Commercial Hub)"
     ],
-    "shift_status": "Active On Duty — Morning Triage Shift",
-    "last_login": "Today at 08:30 AM"
+    "shift_status": "Active On Duty — Zonal Triage Command",
+    "last_login": "Today at 09:00 AM"
 }
+
+def hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
+    if not salt:
+        salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+    return key.hex(), salt
+
+def verify_password(password: str, password_hash: str, salt: str) -> bool:
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+    return secrets.compare_digest(key.hex(), password_hash)
 
 def get_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -41,6 +52,26 @@ def init_db(initial_incidents: Optional[List[Dict[str, Any]]] = None, workers: O
         CREATE TABLE IF NOT EXISTS officer_profile (
             id TEXT PRIMARY KEY,
             data TEXT NOT NULL
+        )
+    """)
+
+    # Officers account table (secure credentials)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS officers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            mobile TEXT NOT NULL UNIQUE,
+            email TEXT,
+            department TEXT,
+            designation TEXT,
+            jurisdiction TEXT,
+            badge_number TEXT,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            is_verified INTEGER DEFAULT 1,
+            approval_status TEXT DEFAULT 'APPROVED',
+            office_address TEXT,
+            created_at TEXT NOT NULL
         )
     """)
 
@@ -94,10 +125,34 @@ def init_db(initial_incidents: Optional[List[Dict[str, Any]]] = None, workers: O
         )
     """)
 
-    # Seed Officer if not present
-    cursor.execute("SELECT id FROM officer_profile WHERE id = ?", (DEFAULT_OFFICER["id"],))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO officer_profile (id, data) VALUES (?, ?)", (DEFAULT_OFFICER["id"], json.dumps(DEFAULT_OFFICER)))
+    # Seed Officer Profile for Yash Kumar
+    cursor.execute("INSERT OR REPLACE INTO officer_profile (id, data) VALUES (?, ?)", (DEFAULT_OFFICER["id"], json.dumps(DEFAULT_OFFICER)))
+
+    # Seed Demo Officer Account: Yash Kumar, Mobile 9761003007, Password yash@specify23
+    cursor.execute("SELECT id FROM officers WHERE mobile = ?", ("9761003007",))
+    existing_demo = cursor.fetchone()
+    if not existing_demo:
+        demo_hash, demo_salt = hash_password("yash@specify23")
+        cursor.execute("""
+            INSERT INTO officers (
+                id, name, mobile, email, department, designation, jurisdiction,
+                badge_number, password_hash, salt, is_verified, approval_status,
+                office_address, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'APPROVED', ?, ?)
+        """, (
+            DEFAULT_OFFICER["id"],
+            "Yash Kumar",
+            "9761003007",
+            "yash.kumar@pwd.delhi.gov.in",
+            DEFAULT_OFFICER["department"],
+            DEFAULT_OFFICER["designation"],
+            DEFAULT_OFFICER["zone"],
+            DEFAULT_OFFICER["badge_number"],
+            demo_hash,
+            demo_salt,
+            DEFAULT_OFFICER["office_address"],
+            datetime.now().isoformat()
+        ))
 
     # Seed workers if provided and empty
     if workers:
@@ -142,11 +197,129 @@ def get_officer_profile() -> Dict[str, Any]:
 def update_officer_profile(data: Dict[str, Any]) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
-    prof_id = data.get("id", "OFF-402")
+    prof_id = data.get("id", DEFAULT_OFFICER["id"])
     cursor.execute("INSERT OR REPLACE INTO officer_profile (id, data) VALUES (?, ?)", (prof_id, json.dumps(data)))
     conn.commit()
     conn.close()
     return data
+
+def authenticate_officer(name: str, mobile: str, password: str) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    clean_mobile = mobile.strip().replace(" ", "").replace("-", "")
+    if clean_mobile.startswith("+91"):
+        clean_mobile = clean_mobile[3:]
+
+    cursor.execute("SELECT * FROM officers WHERE mobile = ? OR mobile = ?", (clean_mobile, mobile.strip()))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    # Check name match (case-insensitive substring or full match)
+    officer_name = row["name"].strip().lower()
+    input_name = name.strip().lower()
+    if input_name != officer_name and input_name not in officer_name and officer_name not in input_name:
+        return None
+
+    # Verify password hash
+    if not verify_password(password, row["password_hash"], row["salt"]):
+        return None
+
+    # Check approval status
+    if row["is_verified"] != 1 or row["approval_status"] != "APPROVED":
+        return None
+
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "mobile": row["mobile"],
+        "email": row["email"],
+        "department": row["department"],
+        "designation": row["designation"],
+        "jurisdiction": row["jurisdiction"],
+        "badgeNumber": row["badge_number"],
+        "isVerified": True,
+        "approvalStatus": "APPROVED",
+        "officeAddress": row["office_address"],
+        "createdAt": row["created_at"]
+    }
+
+def change_officer_password(officer_id: str, current_password: str, new_password: str) -> Tuple[bool, str]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM officers WHERE id = ?", (officer_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False, "Officer not found."
+
+    if not verify_password(current_password, row["password_hash"], row["salt"]):
+        conn.close()
+        return False, "Current password does not match official records."
+
+    new_hash, new_salt = hash_password(new_password)
+    cursor.execute("UPDATE officers SET password_hash = ?, salt = ? WHERE id = ?", (new_hash, new_salt, officer_id))
+    conn.commit()
+    conn.close()
+    return True, "Password successfully updated."
+
+def register_officer_db(data: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    clean_mobile = data["mobile"].strip().replace(" ", "").replace("-", "")
+    if clean_mobile.startswith("+91"):
+        clean_mobile = clean_mobile[3:]
+
+    cursor.execute("SELECT id FROM officers WHERE mobile = ?", (clean_mobile,))
+    if cursor.fetchone():
+        conn.close()
+        raise ValueError("An officer with this mobile number is already registered.")
+
+    p_hash, p_salt = hash_password(data["password"])
+    new_id = f"OFF-{clean_mobile[-4:]}"
+    auto_approve = data.get("autoApprove", False)
+    status_val = "APPROVED" if auto_approve else "PENDING_VERIFICATION"
+    verified_val = 1 if auto_approve else 0
+
+    cursor.execute("""
+        INSERT INTO officers (
+            id, name, mobile, email, department, designation, jurisdiction,
+            badge_number, password_hash, salt, is_verified, approval_status,
+            office_address, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        new_id,
+        data["name"],
+        clean_mobile,
+        data.get("email", ""),
+        data.get("department", "Public Works Department"),
+        data.get("designation", "Assistant Engineer"),
+        data.get("jurisdiction", "Zone 1"),
+        f"GNIDA-OFF-{clean_mobile[-4:]}",
+        p_hash,
+        p_salt,
+        verified_val,
+        status_val,
+        data.get("officeAddress", "GNIDA Administrative Complex"),
+        datetime.now().isoformat()
+    ))
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": new_id,
+        "name": data["name"],
+        "mobile": clean_mobile,
+        "email": data.get("email", ""),
+        "department": data.get("department", "Public Works Department"),
+        "designation": data.get("designation", "Assistant Engineer"),
+        "jurisdiction": data.get("jurisdiction", "Zone 1"),
+        "badgeNumber": f"GNIDA-OFF-{clean_mobile[-4:]}",
+        "isVerified": auto_approve,
+        "approvalStatus": status_val
+    }
 
 def get_all_incidents() -> List[Dict[str, Any]]:
     conn = get_connection()
@@ -218,6 +391,30 @@ def reset_db_data(initial_incidents: List[Dict[str, Any]], workers: List[Dict[st
     cursor.execute("DELETE FROM officer_profile")
     cursor.execute("INSERT INTO officer_profile (id, data) VALUES (?, ?)", (DEFAULT_OFFICER["id"], json.dumps(DEFAULT_OFFICER)))
 
+    # Re-seed demo officer
+    cursor.execute("DELETE FROM officers WHERE mobile = '9761003007'")
+    demo_hash, demo_salt = hash_password("yash@specify23")
+    cursor.execute("""
+        INSERT INTO officers (
+            id, name, mobile, email, department, designation, jurisdiction,
+            badge_number, password_hash, salt, is_verified, approval_status,
+            office_address, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'APPROVED', ?, ?)
+    """, (
+        DEFAULT_OFFICER["id"],
+        "Yash Kumar",
+        "9761003007",
+        "yash.kumar@pwd.delhi.gov.in",
+        DEFAULT_OFFICER["department"],
+        DEFAULT_OFFICER["designation"],
+        DEFAULT_OFFICER["zone"],
+        DEFAULT_OFFICER["badge_number"],
+        demo_hash,
+        demo_salt,
+        DEFAULT_OFFICER["office_address"],
+        datetime.now().isoformat()
+    ))
+
     for w in workers:
         cursor.execute(
             "INSERT INTO workers (id, name, department, team, data) VALUES (?, ?, ?, ?, ?)",
@@ -235,4 +432,3 @@ def reset_db_data(initial_incidents: List[Dict[str, Any]], workers: List[Dict[st
 
     conn.commit()
     conn.close()
-

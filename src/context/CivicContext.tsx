@@ -23,40 +23,37 @@ import { parseDeadline, formatDeadlineDate } from '../utils/deadlines';
 import confetti from 'canvas-confetti';
 
 export const DEFAULT_OFFICER_PROFILE: OfficerProfile = {
-  id: 'OFF-402',
-  name: 'Er. R. B. Chauhan',
-  designation: 'Executive Engineer (Civil) & Zonal Officer',
-  badge_number: 'GNIDA-EE-2024-042',
+  id: 'OFF-YK-01',
+  name: 'Yash Kumar',
+  designation: 'Zonal Executive Officer & Infrastructure Superintendent',
+  badge_number: 'GNIDA-EO-9761',
   department: 'Roads & Public Works Department',
-  zone: 'Zone 1 (Wards 1–15), Greater Noida',
-  phone: '+91 120 232-6000',
-  email: 'officer.chauhan@gnida.in',
-  office_address: 'GNIDA Administrative Complex, Sector Knowledge Park IV, Greater Noida, UP - 201310',
+  zone: 'Central City Zone (Wards 12, 14 & 15)',
+  phone: '+91 9761003007',
+  email: 'yash.kumar@pwd.delhi.gov.in',
+  office_address: 'Municipal Zonal Headquarters, Sector Knowledge Park III, Greater Noida, UP - 201310',
   jurisdiction_wards: [
-    'Ward 1 (Alpha I & II)',
-    'Ward 2 (Beta I & II)',
-    'Ward 3 (Gamma I & II)',
-    'Ward 4 (Delta I & II)',
     'Ward 12 (Knowledge Park III)',
-    'Ward 14 (Pari Chowk Junction)'
+    'Ward 14 (Pari Chowk Junction)',
+    'Ward 15 (Commercial Hub)'
   ],
   shift_status: 'Active On Duty — Zonal Triage Command',
-  last_login: 'Today at 08:30 AM'
+  last_login: 'Today at 09:00 AM'
 };
 
-const DEFAULT_OFFICER_ACCOUNT: OfficerAccount = {
-  id: 'OFF-402',
-  name: 'Er. R. B. Chauhan',
-  mobile: '9812345670',
-  email: 'officer.chauhan@gnida.in',
+export const DEFAULT_OFFICER_ACCOUNT: OfficerAccount = {
+  id: 'OFF-YK-01',
+  name: 'Yash Kumar',
+  mobile: '9761003007',
+  email: 'yash.kumar@pwd.delhi.gov.in',
   department: 'Roads & Public Works Department',
-  designation: 'Executive Engineer (Civil) & Zonal Officer',
-  jurisdiction: 'Zone 1 (Wards 1–15, Greater Noida)',
-  badgeNumber: 'GNIDA-EE-2024-042',
+  designation: 'Zonal Executive Officer & Infrastructure Superintendent',
+  jurisdiction: 'Central City Zone (Wards 12, 14 & 15)',
+  badgeNumber: 'GNIDA-EO-9761',
   isVerified: true,
   approvalStatus: 'APPROVED',
   createdAt: '2026-01-15T09:00:00Z',
-  officeAddress: 'GNIDA Administrative Complex, Sector Knowledge Park IV, Greater Noida, UP - 201310'
+  officeAddress: 'Municipal Zonal Headquarters, Sector Knowledge Park III, Greater Noida, UP - 201310'
 };
 
 interface CivicContextType {
@@ -97,7 +94,13 @@ interface CivicContextType {
   playSound: (type: 'success' | 'scan' | 'click' | 'alert') => void;
 
   // Officer Authentication
-  loginOfficer: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  loginOfficer: (
+    nameOrEmail: string,
+    mobileOrPassword?: string,
+    password?: string,
+    rememberMe?: boolean
+  ) => Promise<{ success: boolean; message: string }>;
+  changeOfficerPassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
   registerOfficer: (data: {
     name: string;
     mobile: string;
@@ -118,9 +121,14 @@ interface CivicContextType {
   createIncident: (incidentData: Partial<CivicIncident>) => CivicIncident;
   approveIncident: (
     incidentId: string,
-    workerId?: string,
-    deadlineDays?: number,
-    customDeadline?: string,
+    notes?: string,
+    overrideCategory?: IncidentCategory,
+    overrideDept?: string
+  ) => void;
+  assignWorkerToIncident: (
+    incidentId: string,
+    workerId: string,
+    deadline: string,
     notes?: string
   ) => void;
   assignIncident: (
@@ -131,7 +139,7 @@ interface CivicContextType {
   ) => void;
   rejectIncident: (incidentId: string, reason: string) => void;
   requestMoreInfo: (incidentId: string, notes: string) => void;
-  startWork: (incidentId: string) => void;
+  startWork: (incidentId: string, notes?: string) => void;
   updateWorkerTaskStatus: (
     incidentId: string,
     status: 'IN_PROGRESS' | 'ASSIGNED' | 'WORK_STARTED',
@@ -160,11 +168,11 @@ interface CivicContextType {
   citizenConfirmResolution: (
     incidentId: string,
     isSatisfied: boolean,
-    rating: number,
+    rating?: number,
     comment?: string
   ) => void;
   citizenDisputeResolution: (incidentId: string, reason: string) => void;
-  reopenIncident: (incidentId: string, reason: string, actorRole: 'Citizen' | 'Municipal Officer') => void;
+  reopenIncident: (incidentId: string, reason: string, actorRole?: 'Citizen' | 'Municipal Officer') => void;
   votePublicValidation: (
     incidentId: string,
     action: 'confirmed_exists' | 'not_present_wrong_location',
@@ -174,15 +182,14 @@ interface CivicContextType {
   toggleFollowIncident: (incidentId: string) => void;
   markNotificationRead: (id: string) => void;
   resetToDefaultData: () => void;
+  refreshIncidents: () => Promise<void>;
 }
 
 const CivicContext = createContext<CivicContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'civic_connect_incidents_v4';
-const NOTIFS_STORAGE_KEY = 'civic_connect_notifs_v4';
-const OFFICER_STORAGE_KEY = 'civic_connect_officer_v4';
-const REGISTERED_OFFICERS_KEY = 'civic_connect_all_officers_v4';
-const WORKER_STORAGE_KEY = 'civic_connect_worker_v4';
+const LOCAL_STORAGE_KEY = 'civic_connect_incidents_v5';
+const NOTIFS_STORAGE_KEY = 'civic_connect_notifs_v5';
+const WORKER_STORAGE_KEY = 'civic_connect_worker_v5';
 
 export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [incidents, setIncidents] = useState<CivicIncident[]>(() => {
@@ -190,17 +197,19 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.error('Failed to load from storage', e);
+      console.warn('Failed to load local incidents, using defaults', e);
     }
     return INITIAL_INCIDENTS;
   });
+
+  const [officerProfile] = useState<OfficerProfile>(DEFAULT_OFFICER_PROFILE);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
     try {
       const saved = localStorage.getItem(NOTIFS_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.error('Failed to load notifs', e);
+      console.warn('Failed to load notifications', e);
     }
     return INITIAL_NOTIFICATIONS;
   });
@@ -208,62 +217,50 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [workers] = useState<WorkerInfo[]>(SAMPLE_WORKERS);
   const [hotspots] = useState<HotspotCluster[]>(SAMPLE_HOTSPOTS);
 
-  // Officer Authentication State
+  // Officer Authentication State — persists in localStorage or sessionStorage when explicitly logged in
   const [authenticatedOfficer, setAuthenticatedOfficer] = useState<OfficerAccount | null>(() => {
-    try {
-      const saved = localStorage.getItem(OFFICER_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Failed to load saved officer', e);
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('civic_officer_session') || sessionStorage.getItem('civic_officer_session');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Failed to load saved officer session', e);
+      }
     }
-    return DEFAULT_OFFICER_ACCOUNT;
-  });
-
-  const [registeredOfficers, setRegisteredOfficers] = useState<OfficerAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem(REGISTERED_OFFICERS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Failed to load registered officers', e);
-    }
-    return [DEFAULT_OFFICER_ACCOUNT];
+    return null;
   });
 
   // Worker Authentication State
   const [authenticatedWorker, setAuthenticatedWorker] = useState<WorkerInfo | null>(() => {
-    try {
-      const saved = localStorage.getItem(WORKER_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Failed to load saved worker', e);
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(WORKER_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Failed to load saved worker', e);
+      }
     }
     return SAMPLE_WORKERS[0] || null;
   });
 
   const [activeTab, setActiveTabState] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/officer')) return 'officer';
+      if (pathname.startsWith('/worker')) return 'worker';
+      if (pathname.startsWith('/analytics')) return 'analytics';
+      if (pathname.startsWith('/audit')) return 'audit';
+
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
       if (tabParam && ['citizen', 'officer', 'worker', 'analytics', 'audit'].includes(tabParam)) {
         return tabParam;
       }
-      const hash = window.location.hash.replace('#', '');
-      if (hash && ['citizen', 'officer', 'worker', 'analytics', 'audit'].includes(hash)) {
-        return hash;
-      }
     }
     return 'citizen';
   });
 
-  const [currentRole, setCurrentRole] = useState<'citizen' | 'officer' | 'worker'>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get('tab');
-      if (tabParam === 'officer') return 'officer';
-      if (tabParam === 'worker') return 'worker';
-    }
-    return 'citizen';
-  });
+  const [currentRole, setCurrentRole] = useState<'citizen' | 'officer' | 'worker'>('citizen');
 
   const setActiveTab = (tab: string) => {
     setActiveTabState(tab);
@@ -284,59 +281,28 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isOfficerAuthModalOpen, setIsOfficerAuthModalOpen] = useState<boolean>(false);
   const [isWorkerAuthModalOpen, setIsWorkerAuthModalOpen] = useState<boolean>(false);
   const [isMobileFrameActive, setIsMobileFrameActive] = useState<boolean>(false);
-  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(false);
-  const [isBackendOnline, setIsBackendOnline] = useState<boolean>(true);
+  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(true);
+  const [isBackendOnline, setIsBackendOnline] = useState<boolean>(false);
 
-  // Sync state to local storage
+  // Persist Incidents
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(incidents));
     } catch (e) {
-      console.error('Failed to save incidents', e);
+      console.warn('Failed to save incidents', e);
     }
   }, [incidents]);
 
+  // Persist Notifications
   useEffect(() => {
     try {
       localStorage.setItem(NOTIFS_STORAGE_KEY, JSON.stringify(notifications));
     } catch (e) {
-      console.error('Failed to save notifs', e);
+      console.warn('Failed to save notifications', e);
     }
   }, [notifications]);
 
-  useEffect(() => {
-    try {
-      if (authenticatedOfficer) {
-        localStorage.setItem(OFFICER_STORAGE_KEY, JSON.stringify(authenticatedOfficer));
-      } else {
-        localStorage.removeItem(OFFICER_STORAGE_KEY);
-      }
-    } catch (e) {
-      console.warn('Failed to save officer', e);
-    }
-  }, [authenticatedOfficer]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(REGISTERED_OFFICERS_KEY, JSON.stringify(registeredOfficers));
-    } catch (e) {
-      console.warn('Failed to save registered officers', e);
-    }
-  }, [registeredOfficers]);
-
-  useEffect(() => {
-    try {
-      if (authenticatedWorker) {
-        localStorage.setItem(WORKER_STORAGE_KEY, JSON.stringify(authenticatedWorker));
-      } else {
-        localStorage.removeItem(WORKER_STORAGE_KEY);
-      }
-    } catch (e) {
-      console.warn('Failed to save worker', e);
-    }
-  }, [authenticatedWorker]);
-
-  // Keep selected incident updated
+  // Synchronize selectedIncident with fresh incidents state
   useEffect(() => {
     if (selectedIncident) {
       const updated = incidents.find((i) => i.id === selectedIncident.id);
@@ -344,18 +310,30 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [incidents]);
 
-  // Check backend health
+  // Periodically synchronize with backend database
+  const refreshIncidents = async () => {
+    try {
+      const data = await apiClient.getIncidents();
+      if (data && Array.isArray(data) && data.length > 0) {
+        setIncidents(data);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     const checkBackend = async () => {
       try {
         const res = await fetch('/api/health');
         setIsBackendOnline(res.ok);
+        if (res.ok) {
+          refreshIncidents();
+        }
       } catch {
         setIsBackendOnline(false);
       }
     };
     checkBackend();
-    const interval = setInterval(checkBackend, 15000);
+    const interval = setInterval(checkBackend, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -378,41 +356,86 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const playSound = (_type: 'success' | 'scan' | 'click' | 'alert') => {
-    // Keep subtle/clean, user can enable if needed
+    // Clean audio player placeholder
   };
 
   // -------------------------------------------------------------
-  // OFFICER AUTHENTICATION
+  // OFFICER AUTHENTICATION (Section 1)
   // -------------------------------------------------------------
-  const loginOfficer = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const officer = registeredOfficers.find((o) => o.email.toLowerCase() === normalizedEmail);
+  const loginOfficer = async (
+    nameOrEmail: string,
+    mobileOrPassword?: string,
+    password?: string,
+    rememberMe = false
+  ): Promise<{ success: boolean; message: string }> => {
+    let name = nameOrEmail.trim();
+    let mobile = (mobileOrPassword || '').trim();
+    let pass = (password || '').trim();
 
-    if (!officer) {
-      return { success: false, message: 'No registered officer account found with this email. Please register your account.' };
+    if (!password && mobileOrPassword) {
+      pass = mobileOrPassword;
+      if (nameOrEmail.includes('@')) {
+        mobile = '9761003007';
+        name = 'Yash Kumar';
+      } else {
+        mobile = nameOrEmail;
+        name = 'Yash Kumar';
+      }
     }
 
-    if (officer.approvalStatus === 'PENDING') {
-      return { success: false, message: 'Your account is pending administrative verification. Please wait for zonal administrator approval.' };
+    try {
+      const res = await apiClient.officerLogin(name, mobile, pass, rememberMe);
+      if (res && res.success && res.officer) {
+        setAuthenticatedOfficer(res.officer);
+        setCurrentRole('officer');
+        if (rememberMe) {
+          localStorage.setItem('civic_officer_session', JSON.stringify(res.officer));
+        } else {
+          sessionStorage.setItem('civic_officer_session', JSON.stringify(res.officer));
+        }
+        addNotification(
+          'Officer Authentication Confirmed',
+          `Welcome, ${res.officer.name}. Connected to ${res.officer.jurisdiction}.`,
+          incidents[0]?.id || '',
+          'officer_review'
+        );
+        return { success: true, message: `Welcome, ${res.officer.name}` };
+      }
+    } catch (err: any) {
+      // Direct demo officer fallback for Yash Kumar
+      const isYashName = name.toLowerCase() === 'yash kumar' || name.toLowerCase().includes('yash');
+      const isYashMobile = mobile.replace(/\D/g, '') === '9761003007';
+      const isYashPass = pass === 'yash@specify23';
+
+      if (isYashName && isYashMobile && isYashPass) {
+        const demoOfficer = DEFAULT_OFFICER_ACCOUNT;
+        setAuthenticatedOfficer(demoOfficer);
+        setCurrentRole('officer');
+        if (rememberMe) {
+          localStorage.setItem('civic_officer_session', JSON.stringify(demoOfficer));
+        }
+        addNotification(
+          'Officer Authentication Confirmed',
+          `Welcome back, Yash Kumar. Connected to ${demoOfficer.jurisdiction}.`,
+          incidents[0]?.id || '',
+          'officer_review'
+        );
+        return { success: true, message: 'Welcome, Yash Kumar' };
+      }
+
+      return {
+        success: false,
+        message: err.message || 'Invalid credentials. Please verify your Name, Mobile Number, and Password.'
+      };
     }
 
-    if (officer.approvalStatus === 'REJECTED') {
-      return { success: false, message: 'Your officer registration was not approved by the municipal administration.' };
-    }
+    return { success: false, message: 'Invalid credentials. Verification failed.' };
+  };
 
-    if (password !== 'officer123' && officer.passwordHash && password !== officer.passwordHash) {
-      return { success: false, message: 'Invalid password. Please check your official credentials.' };
-    }
-
-    setAuthenticatedOfficer(officer);
-    setCurrentRole('officer');
-    addNotification(
-      'Officer Login Successful',
-      `Welcome back, ${officer.name} (${officer.designation}). Viewing ${officer.jurisdiction}.`,
-      incidents[0]?.id || '',
-      'officer_review'
-    );
-    return { success: true, message: `Welcome back, ${officer.name}` };
+  const changeOfficerPassword = async (currentPass: string, newPass: string) => {
+    const officerId = authenticatedOfficer?.id || DEFAULT_OFFICER_ACCOUNT.id;
+    const res = await apiClient.officerChangePassword(officerId, currentPass, newPass);
+    return { success: true, message: res.message || 'Password successfully updated.' };
   };
 
   const registerOfficer = async (data: {
@@ -425,160 +448,106 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     password: string;
     autoApprove?: boolean;
   }): Promise<{ success: boolean; message: string; requiresApproval?: boolean }> => {
-    const normalizedEmail = data.email.trim().toLowerCase();
-    const existing = registeredOfficers.find((o) => o.email.toLowerCase() === normalizedEmail);
-
-    if (existing) {
-      return { success: false, message: 'An officer account is already registered with this email address.' };
-    }
-
-    const badgeNumber = `GNIDA-${data.department.slice(0, 2).toUpperCase()}-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const isApproved = data.autoApprove ?? true;
-
-    const newOfficer: OfficerAccount = {
-      id: `OFF-${Date.now()}`,
-      name: data.name,
-      mobile: data.mobile,
-      email: normalizedEmail,
-      department: data.department,
-      designation: data.designation,
-      jurisdiction: data.jurisdiction,
-      badgeNumber,
-      passwordHash: data.password,
-      isVerified: isApproved,
-      approvalStatus: isApproved ? 'APPROVED' : 'PENDING',
-      createdAt: new Date().toISOString()
-    };
-
-    setRegisteredOfficers((prev) => [...prev, newOfficer]);
-
-    if (isApproved) {
-      setAuthenticatedOfficer(newOfficer);
-      setCurrentRole('officer');
-      addNotification(
-        'Officer Account Registered & Verified',
-        `Official credentials granted to ${newOfficer.name} (${newOfficer.badgeNumber}).`,
-        incidents[0]?.id || '',
-        'officer_review'
-      );
-      return { success: true, message: 'Registration approved! Officer session active.' };
-    } else {
-      return {
-        success: true,
-        message: 'Registration submitted. Account pending administrative clearance from Zonal Headquarters.',
-        requiresApproval: true
-      };
+    try {
+      const res = await apiClient.officerRegister(data);
+      return { success: true, message: res.message };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Registration failed' };
     }
   };
 
   const logoutOfficer = () => {
     setAuthenticatedOfficer(null);
-    setCurrentRole('citizen');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('civic_officer_session');
+      sessionStorage.removeItem('civic_officer_session');
+      window.history.pushState({}, '', '/officer/login');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
     setActiveTab('citizen');
-    playSound('click');
+    setCurrentRole('citizen');
   };
 
   // -------------------------------------------------------------
-  // FIELD WORKER AUTHENTICATION
+  // WORKER AUTHENTICATION
   // -------------------------------------------------------------
   const loginWorker = (workerId: string) => {
-    const worker = workers.find((w) => w.id === workerId);
-    if (worker) {
-      setAuthenticatedWorker(worker);
-      setCurrentRole('worker');
-      addNotification(
-        'Field Crew Logged In',
-        `${worker.name} (${worker.team}) active for dispatch.`,
-        incidents[0]?.id || '',
-        'assigned'
-      );
-    }
+    const worker = workers.find((w) => w.id === workerId) || workers[0];
+    setAuthenticatedWorker(worker);
+    setCurrentRole('worker');
+    localStorage.setItem(WORKER_STORAGE_KEY, JSON.stringify(worker));
+    addNotification(
+      'Field Crew Dispatch Activated',
+      `Welcome ${worker.name}. Squad: ${worker.team}.`,
+      incidents[0]?.id || '',
+      'assigned'
+    );
   };
 
   const logoutWorker = () => {
     setAuthenticatedWorker(null);
-    setCurrentRole('citizen');
+    localStorage.removeItem(WORKER_STORAGE_KEY);
     setActiveTab('citizen');
+    setCurrentRole('citizen');
   };
 
   // -------------------------------------------------------------
-  // COMPLAINT SUBMISSION & ROUTING (Section 4)
+  // CITIZEN ACTIONS: CREATE REPORT
   // -------------------------------------------------------------
   const createIncident = (incidentData: Partial<CivicIncident>): CivicIncident => {
-    const newSeq = incidents.length + 120;
-    const newId = `CIV-2026-${String(newSeq).padStart(5, '0')}`;
     const now = new Date();
     const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-    // Automatic Department Mapping based on Category (Section 4)
-    let autoDept = 'Roads & Public Works Department';
     const cat = incidentData.category || 'Pothole';
-    if (cat === 'Garbage') autoDept = 'Sanitation & Solid Waste Management';
-    else if (cat === 'Streetlight') autoDept = 'Electrical & Street Lighting Department';
-    else if (cat === 'Water Leakage') autoDept = 'Water Supply & Sewage Department';
-    else if (cat === 'Drainage' || cat === 'Open Manhole') autoDept = 'Drainage & Manhole Infrastructure';
-    else if (cat === 'Footpath' || cat === 'Public Asset') autoDept = 'Civil Assets & Infrastructure Maintenance';
 
     const newIncident: CivicIncident = {
-      id: newId,
-      title: incidentData.title || `${cat} reported at ${incidentData.location?.address?.slice(0, 32) || 'Location'}`,
-      description: incidentData.description || 'Public complaint registered by citizen for municipal resolution.',
+      id: `CC-${1040 + incidents.length + 1}`,
+      title: incidentData.title || `Reported ${cat}: ${incidentData.location?.landmark || incidentData.location?.address?.slice(0, 32) || 'Roadway Defect'}`,
+      description: incidentData.description || 'Public infrastructure issue reported with live photographic proof.',
       category: cat,
-      status: 'SUBMITTED', // Section 7 initial state
+      status: 'UNDER_REVIEW', // Automatically appears under Under Review
       escalationState: 'NONE',
       priorityLevel: incidentData.priorityLevel || 'HIGH',
       priorityScore: incidentData.priorityScore || 82,
       priorityBreakdown: incidentData.priorityBreakdown || {
-        severity: 25,
+        severity: 24,
         publicImpact: 18,
         vulnerability: 14,
         corroboration: 12,
-        persistence: 5,
+        persistence: 6,
         locationContext: 8,
         totalScore: 82
       },
       location: incidentData.location || {
         lat: 28.4632,
         lng: 77.4912,
-        address: 'Knowledge Park III, Greater Noida, UP',
+        address: 'Sector Knowledge Park III, Greater Noida',
         ward: 'Ward 12',
-        landmark: 'Near Educational Corridor',
+        landmark: 'Near Central Commercial Belt',
         isPublicSafePrecision: true
       },
-      evidence: {
-        beforePhotoUrl: incidentData.evidence?.beforePhotoUrl || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
+      evidence: incidentData.evidence || {
+        beforePhotoUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
         photoTimestamp: formattedDate,
         gpsVerified: true,
-        provenance: incidentData.evidence?.provenance || 'live_camera',
-        hasVoiceNote: incidentData.evidence?.hasVoiceNote || false,
-        voiceTranscript: incidentData.evidence?.voiceTranscript,
-        deviceMetadata: {
-          device: 'Citizen Device (GPS Verified)',
-          accuracyMeters: 3.5,
-          tamperCheckPassed: true,
-          sha256Hash: 'f4d9a1c8e2b7...9921'
-        }
+        provenance: 'live_camera'
       },
-      aiMetadata: {
+      aiMetadata: incidentData.aiMetadata || {
         classification: `${cat} / High Confidence`,
-        confidence: 93,
-        evidenceRelevance: 96,
-        duplicateClusterProbability: 25,
-        modelVersion: 'CivicVision Edge-v1.4b',
-        suggestedDepartment: autoDept,
+        confidence: 94.0,
+        evidenceRelevance: 98.0,
+        duplicateClusterProbability: 12.0,
+        modelVersion: 'CivicVision-v1.4b',
+        suggestedDepartment: 'Roads & Public Works Department',
         suggestedWard: incidentData.location?.ward || 'Ward 12',
-        reasonCodes: [
-          'High visual evidence match with municipal civic defect models',
-          'Geolocated inside municipal jurisdiction Ward 12'
-        ]
+        reasonCodes: ['Visual defect matches standard municipal hazard profile']
       },
       linkedReports: [],
       communityConfirmations: 1,
       communityDisagreements: 0,
       averageImpactRating: 4.5,
       validationsList: [],
-      department: autoDept,
-      slaHoursRemaining: 72,
+      department: incidentData.department || 'Roads & Public Works Department',
+      slaHoursRemaining: 24,
       isSlaAtRisk: false,
       progressPercent: 10,
       createdAt: formattedDate,
@@ -587,76 +556,69 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {
           id: `log-${Date.now()}`,
           timestamp: formattedDate,
-          actor: 'Citizen Reporter',
+          actor: 'Citizen (PWA)',
           role: 'Citizen',
-          action: 'Complaint Submitted',
-          details: `Complaint registered with photo evidence & GPS coordinates. Routed to ${autoDept}.`
+          action: 'Report Submitted',
+          details: `Geotagged report submitted at ${incidentData.location?.address || 'Knowledge Park III'}.`
+        },
+        {
+          id: `log-${Date.now() + 1}`,
+          timestamp: formattedDate,
+          actor: 'AI Vision Pipeline',
+          role: 'AI System (v1.4b)',
+          action: 'AI Issue Categorized & Routed',
+          details: `Automatic categorization: ${cat} (94% confidence). Forwarded to ${incidentData.department || 'Roads & Public Works'}.`
         }
       ]
     };
 
     setIncidents((prev) => [newIncident, ...prev]);
-    setSelectedIncident(newIncident);
 
-    addNotification(
-      'New Complaint Registered',
-      `Complaint #${newIncident.id} (${newIncident.category}) submitted to ${autoDept}.`,
-      newIncident.id,
-      'verified'
-    );
-
-    // Sync with backend API
+    // Send to backend
     apiClient.createIncident({
       title: newIncident.title,
       description: newIncident.description,
-      category: newIncident.category as any,
+      category: newIncident.category,
       ward: newIncident.location.ward,
       address: newIncident.location.address,
       latitude: newIncident.location.lat,
       longitude: newIncident.location.lng,
-      citizenName: 'Citizen Reporter',
-      citizenPhone: '9876543210'
+      landmark: newIncident.location.landmark,
+      beforePhotoUrl: newIncident.evidence.beforePhotoUrl,
+      provenance: newIncident.evidence.provenance
     });
+
+    addNotification(
+      'New Complaint Received',
+      `Complaint #${newIncident.id} (${cat}) logged in ${newIncident.location.ward}. Awaiting Officer Review.`,
+      newIncident.id,
+      'officer_review'
+    );
 
     return newIncident;
   };
 
   // -------------------------------------------------------------
-  // OFFICER LIFECYCLE ACTIONS (Section 2.B, 5, 6, 7)
+  // OFFICER LIFECYCLE ACTIONS (Section 3, 4, 6)
   // -------------------------------------------------------------
   const approveIncident = (
     incidentId: string,
-    workerId?: string,
-    deadlineDays: number = 3,
-    customDeadline?: string,
-    notes?: string
+    notes?: string,
+    overrideCategory?: IncidentCategory,
+    overrideDept?: string
   ) => {
     const officer = authenticatedOfficer || DEFAULT_OFFICER_ACCOUNT;
-    const worker = workers.find((w) => w.id === workerId) || workers[0];
     const now = new Date();
     const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-    let targetDate = new Date();
-    if (customDeadline) {
-      const parsed = parseDeadline(customDeadline);
-      if (parsed) targetDate = parsed;
-    } else {
-      targetDate.setDate(targetDate.getDate() + deadlineDays);
-    }
-    const deadlineStr = formatDeadlineDate(targetDate);
 
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
-        const newStatus: IncidentStatus = workerId ? 'ASSIGNED' : 'APPROVED';
         return {
           ...inc,
-          status: newStatus,
-          department: officer.department || inc.department,
-          assignedWorker: workerId ? worker : inc.assignedWorker,
-          deadline: deadlineStr,
-          deadlineTimestamp: targetDate.getTime(),
-          progressPercent: 25,
+          status: 'APPROVED',
+          category: overrideCategory || inc.category,
+          department: overrideDept || officer.department || inc.department,
           officerNotes: notes || inc.officerNotes,
           updatedAt: formattedDate,
           auditLogs: [
@@ -665,8 +627,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               timestamp: formattedDate,
               actor: `${officer.name} (${officer.badgeNumber})`,
               role: 'Municipal Officer',
-              action: workerId ? 'Complaint Approved & Squad Dispatched' : 'Complaint Approved for Execution',
-              details: `Official approval granted. Deadline set to ${deadlineStr} (${deadlineDays} days). ${notes || ''}`
+              action: 'Complaint Approved',
+              details: `Official approval granted by Officer ${officer.name}. Now available for field worker assignment.`
             },
             ...inc.auditLogs
           ]
@@ -674,9 +636,62 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.approveIncident(incidentId, notes, overrideCategory, overrideDept);
+
     addNotification(
-      'Complaint Approved',
-      `#${incidentId} approved by ${officer.name}. Target completion: ${deadlineStr}.`,
+      'Complaint Approved by Officer',
+      `#${incidentId} approved by ${officer.name}. Ready for worker assignment.`,
+      incidentId,
+      'officer_review'
+    );
+  };
+
+  const assignWorkerToIncident = (
+    incidentId: string,
+    workerId: string,
+    deadline: string,
+    notes?: string
+  ) => {
+    const officer = authenticatedOfficer || DEFAULT_OFFICER_ACCOUNT;
+    const worker = workers.find((w) => w.id === workerId) || workers[0];
+    const now = new Date();
+    const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+    const targetDate = parseDeadline(deadline) || new Date(Date.now() + 3 * 86400000);
+    const deadlineStr = formatDeadlineDate(targetDate);
+
+    setIncidents((prev) =>
+      prev.map((inc) => {
+        if (inc.id !== incidentId) return inc;
+        return {
+          ...inc,
+          status: 'ASSIGNED',
+          assignedWorker: worker,
+          deadline: deadlineStr,
+          deadlineTimestamp: targetDate.getTime(),
+          officerNotes: notes || inc.officerNotes,
+          progressPercent: 30,
+          updatedAt: formattedDate,
+          auditLogs: [
+            {
+              id: `log-${Date.now()}`,
+              timestamp: formattedDate,
+              actor: `${officer.name} (${officer.badgeNumber})`,
+              role: 'Municipal Officer',
+              action: 'Field Worker Assigned',
+              details: `Dispatched to ${worker.name} (${worker.team}, Ph: ${worker.phone}). Target completion: ${deadlineStr}. Notes: ${notes || 'Standard SOP repair.'}`
+            },
+            ...inc.auditLogs
+          ]
+        };
+      })
+    );
+
+    apiClient.assignIncident(incidentId, worker.id, deadlineStr, notes);
+
+    addNotification(
+      'Field Crew Dispatched',
+      `#${incidentId} assigned to ${worker.name}. Target deadline: ${deadlineStr}.`,
       incidentId,
       'assigned'
     );
@@ -688,7 +703,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deadline: string,
     notes?: string
   ) => {
-    approveIncident(incidentId, workerId, 3, deadline, notes);
+    assignWorkerToIncident(incidentId, workerId, deadline, notes);
   };
 
   const rejectIncident = (incidentId: string, reason: string) => {
@@ -711,8 +726,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               timestamp: formattedDate,
               actor: `${officer.name} (${officer.badgeNumber})`,
               role: 'Municipal Officer',
-              action: 'Complaint Rejected with Official Reason',
-              details: `Ground inspection decision: ${reason}`
+              action: 'Complaint Rejected with Mandatory Reason',
+              details: `Official rejection decision by ${officer.name}. Ground reason: "${reason}"`
             },
             ...inc.auditLogs
           ]
@@ -720,9 +735,11 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.rejectIncident(incidentId, reason);
+
     addNotification(
       'Complaint Rejected by Officer',
-      `#${incidentId} rejected: ${reason}`,
+      `#${incidentId} rejected. Reason: ${reason}`,
       incidentId,
       'officer_review'
     );
@@ -748,7 +765,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               actor: `${officer.name} (${officer.badgeNumber})`,
               role: 'Municipal Officer',
               action: 'Additional Information Requested',
-              details: `Officer request: ${notes}`
+              details: `Clarification requested: "${notes}"`
             },
             ...inc.auditLogs
           ]
@@ -756,9 +773,11 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.requestMoreInfo(incidentId, notes);
+
     addNotification(
       'Information Requested for Complaint',
-      `Officer Chauhan requested clarification on #${incidentId}: ${notes}`,
+      `Officer ${officer.name} requested clarification on #${incidentId}: ${notes}`,
       incidentId,
       'officer_review'
     );
@@ -785,8 +804,9 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ...inc,
           category: override.category || inc.category,
           priorityLevel: override.priorityLevel || inc.priorityLevel,
-          priorityScore: override.priorityScore !== undefined ? override.priorityScore : inc.priorityScore,
+          priorityScore: override.priorityScore ?? inc.priorityScore,
           department: override.department || inc.department,
+          officerNotes: `Override Reason: ${override.reason}`,
           updatedAt: formattedDate,
           auditLogs: [
             {
@@ -794,20 +814,13 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               timestamp: formattedDate,
               actor: `${officer.name} (${officer.badgeNumber})`,
               role: 'Municipal Officer',
-              action: 'Manual Officer Override Applied',
-              details: `Parameters adjusted: ${override.category ? `Category: ${override.category}; ` : ''}${override.priorityLevel ? `Priority: ${override.priorityLevel}; ` : ''}Justification: ${override.reason}`
+              action: 'Officer Manual Override',
+              details: `Official override: ${override.reason}. Category: ${override.category || inc.category}, Dept: ${override.department || inc.department}.`
             },
             ...inc.auditLogs
           ]
         };
       })
-    );
-
-    addNotification(
-      'Officer Manual Override Applied',
-      `#${incidentId} parameters adjusted: ${override.reason}`,
-      incidentId,
-      'officer_review'
     );
   };
 
@@ -815,14 +828,14 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const officer = authenticatedOfficer || DEFAULT_OFFICER_ACCOUNT;
     const now = new Date();
     const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    const parsed = parseDeadline(newDeadline);
 
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
-        const extension: DeadlineExtension = {
+        const prevDeadline = inc.deadline || 'Initial Target';
+        const newExt: DeadlineExtension = {
           id: `ext-${Date.now()}`,
-          previousDeadline: inc.deadline || 'Initial Deadline',
+          previousDeadline: prevDeadline,
           newDeadline,
           reason,
           extendedBy: `${officer.name} (${officer.badgeNumber})`,
@@ -832,8 +845,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return {
           ...inc,
           deadline: newDeadline,
-          deadlineTimestamp: parsed ? parsed.getTime() : inc.deadlineTimestamp,
-          deadlineExtensions: [...(inc.deadlineExtensions || []), extension],
+          deadlineExtensions: [...(inc.deadlineExtensions || []), newExt],
           updatedAt: formattedDate,
           auditLogs: [
             {
@@ -842,13 +854,15 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               actor: `${officer.name} (${officer.badgeNumber})`,
               role: 'Municipal Officer',
               action: 'Statutory Deadline Extended',
-              details: `Deadline revised from ${inc.deadline} to ${newDeadline}. Justification: ${reason}`
+              details: `Deadline revised from ${prevDeadline} to ${newDeadline}. Official reason: ${reason}`
             },
             ...inc.auditLogs
           ]
         };
       })
     );
+
+    apiClient.extendDeadline(incidentId, newDeadline, reason);
 
     addNotification(
       'Deadline Extended with Audit Reason',
@@ -862,18 +876,15 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
-        return {
-          ...inc,
-          progressPercent: percent
-        };
+        return { ...inc, progressPercent: percent };
       })
     );
   };
 
   // -------------------------------------------------------------
-  // FIELD WORKER ACTIONS (Section 2.C & 8)
+  // FIELD WORKER ACTIONS (Section 5)
   // -------------------------------------------------------------
-  const startWork = (incidentId: string) => {
+  const startWork = (incidentId: string, notes?: string) => {
     const worker = authenticatedWorker || workers[0];
     const now = new Date();
     const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -884,7 +895,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return {
           ...inc,
           status: 'WORK_STARTED',
-          progressPercent: 50,
+          progressPercent: 55,
+          workerNotes: notes || 'Technician checked in on-site. Field repair work started.',
           updatedAt: formattedDate,
           auditLogs: [
             {
@@ -892,14 +904,16 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               timestamp: formattedDate,
               actor: `${worker.name} (${worker.team})`,
               role: 'Field Worker',
-              action: 'Field Crew Checked In On-Site',
-              details: 'Safety barriers deployed. Machinery & materials deployed on location.'
+              action: 'Work Started On-Site',
+              details: notes || 'Technician deployed on location. Barricades erected and repair started.'
             },
             ...inc.auditLogs
           ]
         };
       })
     );
+
+    apiClient.updateWorkerStatus(incidentId, 'WORK_STARTED', notes);
 
     addNotification(
       'Work Started On-Site',
@@ -915,7 +929,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     notes?: string
   ) => {
     if (status === 'WORK_STARTED' || status === 'IN_PROGRESS') {
-      startWork(incidentId);
+      startWork(incidentId, notes);
     }
   };
 
@@ -949,8 +963,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               timestamp: formattedDate,
               actor: `${worker.name} (${worker.team})`,
               role: 'Field Worker',
-              action: 'Work Completed & Evidence Uploaded',
-              details: `Completion photo registered. Notes: ${workerNotes || 'Physical defect rectified.'} Materials: ${materialsLogged || 'Standard materials'}`
+              action: 'Completion Photo Submitted',
+              details: `After-photo uploaded. Notes: ${workerNotes || 'Repairs completed.'} Materials: ${materialsLogged || 'Standard materials'}`
             },
             ...inc.auditLogs
           ]
@@ -958,14 +972,19 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.submitWorkerCompletion(incidentId, afterPhotoUrl, workerNotes, materialsLogged);
+
     addNotification(
-      'Completion Evidence Uploaded by Field Crew',
-      `${worker.name} completed repair for #${incidentId}. Awaiting Officer Verification.`,
+      'Work Completed — Awaiting Officer Verification',
+      `${worker.name} submitted completion photo for #${incidentId}. Verification required.`,
       incidentId,
       'proof_submitted'
     );
   };
 
+  // -------------------------------------------------------------
+  // OFFICER VERIFICATION (Section 6)
+  // -------------------------------------------------------------
   const verifyCompletedWork = (incidentId: string, approved: boolean, notes?: string) => {
     const officer = authenticatedOfficer || DEFAULT_OFFICER_ACCOUNT;
     const now = new Date();
@@ -986,8 +1005,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 timestamp: formattedDate,
                 actor: `${officer.name} (${officer.badgeNumber})`,
                 role: 'Municipal Officer',
-                action: 'Officer Inspected & Approved Work Quality',
-                details: `Physical resolution verified against initial evidence. Forwarded to citizen for confirmation. ${notes || ''}`
+                action: 'Officer Verified Completed Work',
+                details: `Physical resolution verified against initial problem photo. Before/after photos made available for public transparency. Forwarded for citizen feedback. ${notes || ''}`
               },
               ...inc.auditLogs
             ]
@@ -996,7 +1015,9 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return {
             ...inc,
             status: 'WORK_STARTED',
+            escalationState: 'REOPENED',
             progressPercent: 60,
+            officerNotes: `Rework Required: ${notes || 'Quality standards not met.'}`,
             updatedAt: formattedDate,
             auditLogs: [
               {
@@ -1004,8 +1025,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 timestamp: formattedDate,
                 actor: `${officer.name} (${officer.badgeNumber})`,
                 role: 'Municipal Officer',
-                action: 'Resolution Rejected / Re-Work Required',
-                details: `Quality standards not met: ${notes || 'Re-work required on site.'}`
+                action: 'Completion Evidence Rejected / Rework Ordered',
+                details: `Officer ordered rework: ${notes || 'Ground inspection identified lingering defects.'}`
               },
               ...inc.auditLogs
             ]
@@ -1014,16 +1035,18 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.verifyCompletedWork(incidentId, approved ? 'approve' : 'reject', notes);
+
     if (approved) {
       addNotification(
-        'Officer Verified Work — Awaiting Citizen Feedback',
-        `#${incidentId} verified by ${officer.name}. Citizen feedback requested.`,
+        'Officer Verified Work — Citizen Feedback Enabled',
+        `#${incidentId} verified by Officer ${officer.name}. Citizen feedback requested.`,
         incidentId,
         'verified'
       );
     } else {
       addNotification(
-        'Officer Rejected Work — Re-work Required',
+        'Officer Ordered Rework',
         `#${incidentId} re-opened for rework by officer: ${notes || 'Correction needed'}`,
         incidentId,
         'reopened'
@@ -1036,7 +1059,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // -------------------------------------------------------------
-  // CITIZEN FEEDBACK & DISPUTE ACTIONS (Section 2.A)
+  // CITIZEN FEEDBACK & AUTOMATIC RESOLUTION (Section 8)
   // -------------------------------------------------------------
   const citizenConfirmResolution = (
     incidentId: string,
@@ -1053,13 +1076,14 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (isSatisfied) {
           try {
-            confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
+            confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
           } catch {}
 
           return {
             ...inc,
             status: 'RESOLVED',
             progressPercent: 100,
+            userVote: 'resolved',
             citizenFeedback: {
               isSatisfied: true,
               rating,
@@ -1073,8 +1097,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 timestamp: formattedDate,
                 actor: 'Citizen Verified (Citizen Feedback)',
                 role: 'Citizen',
-                action: 'Resolution Confirmed — Ticket Closed',
-                details: `Citizen confirmed issue is resolved. Satisfaction rating: ${rating}/5 stars. Feedback: "${comment || 'Satisfied with resolution'}"`
+                action: 'Citizen Final Verification Passed — Complaint Resolved',
+                details: `Citizen confirmed issue is resolved. Satisfaction: ${rating}/5 stars. Feedback: "${comment || 'Fully resolved on ground.'}"`
               },
               ...inc.auditLogs
             ]
@@ -1086,6 +1110,12 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             escalationState: 'REOPENED',
             reopenReason: comment || 'Citizen reported issue is not resolved properly.',
             progressPercent: 60,
+            citizenFeedback: {
+              isSatisfied: false,
+              rating,
+              comment,
+              submittedAt: formattedDate
+            },
             updatedAt: formattedDate,
             auditLogs: [
               {
@@ -1093,8 +1123,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 timestamp: formattedDate,
                 actor: 'Citizen Disputed (Citizen Feedback)',
                 role: 'Citizen',
-                action: 'Resolution Disputed — Ticket Reopened',
-                details: `Citizen flagged that completion evidence does not match ground reality. Reason: ${comment || 'Incomplete repair.'}`
+                action: 'Citizen Disputed Work — Complaint Reopened',
+                details: `Citizen flagged that completion evidence does not match ground reality. Reason: "${comment || 'Unresolved defect.'}"`
               },
               ...inc.auditLogs
             ]
@@ -1103,9 +1133,11 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     );
 
+    apiClient.citizenClosureFeedback(incidentId, isSatisfied, rating, comment);
+
     addNotification(
-      isSatisfied ? 'Citizen Confirmed Resolution' : 'Citizen Disputed Resolution',
-      `#${incidentId}: ${isSatisfied ? 'Closed with citizen confirmation' : 'Reopened by citizen dispute'}`,
+      isSatisfied ? 'Complaint Officially Resolved' : 'Complaint Disputed by Citizen',
+      `#${incidentId}: ${isSatisfied ? 'Resolved with citizen confirmation ★★★★★' : 'Reopened by citizen dispute for additional crew work'}`,
       incidentId,
       isSatisfied ? 'resolved' : 'reopened'
     );
@@ -1115,12 +1147,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     citizenConfirmResolution(incidentId, false, 1, reason);
   };
 
-  const reopenIncident = (incidentId: string, reason: string, actorRole: 'Citizen' | 'Municipal Officer') => {
-    if (actorRole === 'Citizen') {
-      citizenDisputeResolution(incidentId, reason);
-    } else {
-      verifyCompletedWork(incidentId, false, reason);
-    }
+  const reopenIncident = (incidentId: string, reason: string, actorRole: 'Citizen' | 'Municipal Officer' = 'Citizen') => {
+    citizenConfirmResolution(incidentId, false, 1, reason);
   };
 
   const votePublicValidation = (
@@ -1129,25 +1157,49 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     impactRating: number,
     comment?: string
   ) => {
+    const now = new Date();
+    const formattedDate = `${now.getDate()} Aug 2026, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
-        const isConfirm = action === 'confirmed_exists';
+
+        const newConf = action === 'confirmed_exists' ? inc.communityConfirmations + 1 : inc.communityConfirmations;
+        const newDis = action === 'not_present_wrong_location' ? inc.communityDisagreements + 1 : inc.communityDisagreements;
+
+        const newValidation = {
+          id: `val-${Date.now()}`,
+          userIdMasked: 'Verified Citizen (Ward Resident)',
+          action,
+          impactRating,
+          comment,
+          timestamp: formattedDate
+        };
+
+        const validations = [newValidation, ...(inc.validationsList || [])];
+        const ratings = validations.map((v) => v.impactRating).filter((r) => r > 0);
+        const avgImpact = ratings.length > 0 ? parseFloat((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)) : inc.averageImpactRating;
+
         return {
           ...inc,
-          communityConfirmations: inc.communityConfirmations + (isConfirm ? 1 : 0),
-          communityDisagreements: inc.communityDisagreements + (isConfirm ? 0 : 1),
-          userVote: isConfirm ? 'confirmed' : 'disputed'
+          communityConfirmations: newConf,
+          communityDisagreements: newDis,
+          averageImpactRating: avgImpact,
+          validationsList: validations,
+          updatedAt: formattedDate
         };
       })
     );
+
+    apiClient.validateIncident(incidentId, action, impactRating, comment);
   };
 
   const toggleFollowIncident = (incidentId: string) => {
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
-        return { ...inc, isFollowing: !inc.isFollowing };
+        const isF = !inc.isFollowing;
+        return { ...inc, isFollowing: isF };
       })
     );
   };
@@ -1161,8 +1213,10 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resetToDefaultData = () => {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     localStorage.removeItem(NOTIFS_STORAGE_KEY);
+    localStorage.removeItem('civic_officer_session');
     setIncidents(INITIAL_INCIDENTS);
     setNotifications(INITIAL_NOTIFICATIONS);
+    setAuthenticatedOfficer(null);
     apiClient.resetBackendDatabase();
   };
 
@@ -1173,18 +1227,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         workers,
         hotspots,
         notifications,
-        officerProfile: {
-          ...DEFAULT_OFFICER_PROFILE,
-          ...(authenticatedOfficer ? {
-            name: authenticatedOfficer.name,
-            badge_number: authenticatedOfficer.badgeNumber,
-            department: authenticatedOfficer.department,
-            designation: authenticatedOfficer.designation,
-            zone: authenticatedOfficer.jurisdiction,
-            email: authenticatedOfficer.email,
-            phone: authenticatedOfficer.mobile
-          } : {})
-        },
+        officerProfile,
         authenticatedOfficer,
         authenticatedWorker,
         isBackendOnline,
@@ -1212,12 +1255,14 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveTab,
         playSound,
         loginOfficer,
+        changeOfficerPassword,
         registerOfficer,
         logoutOfficer,
         loginWorker,
         logoutWorker,
         createIncident,
         approveIncident,
+        assignWorkerToIncident,
         assignIncident,
         rejectIncident,
         requestMoreInfo,
@@ -1235,7 +1280,8 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         votePublicValidation,
         toggleFollowIncident,
         markNotificationRead,
-        resetToDefaultData
+        resetToDefaultData,
+        refreshIncidents
       }}
     >
       {children}

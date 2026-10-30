@@ -71,8 +71,12 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
   // Citizen Feedback State
   const [citizenRating, setCitizenRating] = useState<number>(5);
+  const [resolutionChoice, setResolutionChoice] = useState<'fully_resolved' | 'partially_resolved' | 'not_resolved'>('fully_resolved');
   const [citizenComment, setCitizenComment] = useState<string>('');
   const [disputeReason, setDisputeReason] = useState<string>('');
+  const [disputePhotoUrl, setDisputePhotoUrl] = useState<string>('');
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState<string | null>(null);
   const [showDisputeDialog, setShowDisputeDialog] = useState<boolean>(false);
 
   if (!incident) return null;
@@ -119,6 +123,33 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
     setIsSubmittingProof(true);
     submitRepairProof(incident.id, workerAfterPhoto, workerRepairNotes, workerMaterials);
     setIsSubmittingProof(false);
+  };
+
+  const handleCitizenSubmitFeedback = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeedbackError(null);
+
+    if (resolutionChoice === 'fully_resolved') {
+      citizenConfirmResolution(
+        incident.id,
+        true,
+        citizenRating,
+        citizenComment || 'Work verified on the ground by citizen. Issue satisfactorily resolved.'
+      );
+      setFeedbackSuccessMsg('Thank you! Your feedback has officially closed this issue.');
+      playSound('success');
+    } else {
+      if (!disputeReason.trim()) {
+        setFeedbackError('Please explain why the issue is not fully resolved.');
+        return;
+      }
+      citizenDisputeResolution(
+        incident.id,
+        `${disputeReason.trim()} [Status: ${resolutionChoice === 'partially_resolved' ? 'Partially Resolved' : 'Not Resolved'}]${disputePhotoUrl ? ` Evidence: ${disputePhotoUrl}` : ''}`
+      );
+      setFeedbackSuccessMsg('Dispute submitted. Complaint has been reopened and returned to Officer Command for reinspection.');
+      playSound('alert');
+    }
   };
 
   const handleCitizenConfirm = () => {
@@ -168,8 +199,9 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', minWidth: '650px', justifyContent: 'space-between' }}>
             {timelineStages.map((stg, idx) => {
-              const isPast = idx < currentStageIdx;
-              const isCurrent = idx === currentStageIdx;
+              const isResolved = incident.status === 'RESOLVED';
+              const isPast = isResolved || idx < currentStageIdx;
+              const isCurrent = !isResolved && idx === currentStageIdx;
 
               return (
                 <div key={stg.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
@@ -179,14 +211,14 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                         width: '22px',
                         height: '22px',
                         borderRadius: '50%',
-                        background: isCurrent ? 'var(--civic-600)' : isPast ? '#059669' : 'var(--slate-300)',
+                        background: isResolved ? '#059669' : isCurrent ? 'var(--civic-600)' : isPast ? '#059669' : 'var(--slate-300)',
                         color: 'var(--white)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '0.65rem',
                         fontWeight: 800,
-                        boxShadow: isCurrent ? '0 0 0 3px rgba(37, 99, 235, 0.25)' : 'none'
+                        boxShadow: isResolved ? '0 0 0 3px rgba(16, 185, 129, 0.25)' : isCurrent ? '0 0 0 3px rgba(37, 99, 235, 0.25)' : 'none'
                       }}
                     >
                       {isPast ? <Check size={12} /> : idx + 1}
@@ -194,8 +226,8 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                     <span
                       style={{
                         fontSize: '0.65rem',
-                        fontWeight: isCurrent ? 800 : 600,
-                        color: isCurrent ? 'var(--civic-700)' : isPast ? 'var(--slate-700)' : 'var(--slate-400)',
+                        fontWeight: isResolved || isCurrent ? 800 : 600,
+                        color: isResolved ? '#059669' : isCurrent ? 'var(--civic-700)' : isPast ? 'var(--slate-700)' : 'var(--slate-400)',
                         textAlign: 'center',
                         whiteSpace: 'nowrap'
                       }}
@@ -208,7 +240,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                       style={{
                         flex: 1,
                         height: '2px',
-                        background: isPast ? '#059669' : 'var(--slate-200)',
+                        background: (isResolved || idx < currentStageIdx) ? '#059669' : 'var(--slate-200)',
                         margin: '0 4px',
                         marginBottom: '14px'
                       }}
@@ -374,55 +406,292 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* CITIZEN VERIFICATION & DISPUTE SECTION (Section 2.A) */}
-              {(incident.status === 'WORK_COMPLETED' || incident.status === 'AWAITING_CITIZEN_FEEDBACK' || incident.status === 'RESOLVED') && (
+              {/* CITIZEN VERIFICATION & FEEDBACK SECTION (Section 8) */}
+              {(incident.status === 'AWAITING_CITIZEN_FEEDBACK' || incident.status === 'PUBLIC_VERIFY') && (
                 <div
                   style={{
                     background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
-                    border: '1px solid #bbf7d0',
-                    padding: '1rem',
-                    borderRadius: 'var(--radius-lg)'
+                    border: '1.5px solid #86efac',
+                    padding: '1.25rem',
+                    borderRadius: 'var(--radius-lg)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircle2 size={18} style={{ color: '#059669' }} />
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#166534', margin: 0 }}>
-                          Citizen Verification & Ground Review
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <ShieldCheck size={20} style={{ color: '#059669' }} />
+                        <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#166534', margin: 0 }}>
+                          Citizen Ground Verification & Feedback
                         </h4>
+                        <span style={{ fontSize: '0.68rem', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, border: '1px solid #86efac' }}>
+                          Officer Verified ✓
+                        </span>
                       </div>
-                      <p style={{ fontSize: '0.75rem', color: '#15803d', margin: '3px 0 0 0' }}>
-                        Inspect the field worker's completion evidence to confirm whether the problem has been satisfactorily solved on the ground.
+                      <p style={{ fontSize: '0.78rem', color: '#15803d', margin: '4px 0 0 0' }}>
+                        The responsible officer has verified the completion proof. Please review the repair on the ground and submit your feedback to finalize closure.
                       </p>
                     </div>
-
-                    {incident.citizenFeedback && (
-                      <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '4px', fontWeight: 800 }}>
-                        Citizen Rating: {incident.citizenFeedback.rating}/5 ★
-                      </span>
-                    )}
                   </div>
 
-                  {incident.status === 'AWAITING_CITIZEN_FEEDBACK' && (
-                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={handleCitizenConfirm}
-                        className="btn btn-primary"
-                        style={{ background: '#059669', borderColor: '#059669', fontSize: '0.8rem', fontWeight: 700 }}
-                      >
-                        <Check size={14} /> Confirm Problem is Solved (5★)
-                      </button>
-
-                      <button
-                        onClick={() => setShowDisputeDialog(true)}
-                        className="btn btn-secondary text-danger"
-                        style={{ fontSize: '0.8rem', fontWeight: 700 }}
-                      >
-                        <RotateCcw size={14} /> Dispute / Reopen Complaint
-                      </button>
+                  {feedbackSuccessMsg && (
+                    <div style={{ padding: '0.75rem', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 'var(--radius-md)', color: '#166534', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={16} />
+                      <span>{feedbackSuccessMsg}</span>
                     </div>
                   )}
+
+                  {feedbackError && (
+                    <div style={{ padding: '0.75rem', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', color: '#991b1b', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertCircle size={16} />
+                      <span>{feedbackError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleCitizenSubmitFeedback} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {/* 1. Star Rating */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#14532d', marginBottom: '4px' }}>
+                        1. Rate Satisfaction with Resolution (1 to 5 Stars):
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            type="button"
+                            key={star}
+                            onClick={() => setCitizenRating(star)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              color: citizenRating >= star ? '#f59e0b' : '#cbd5e1'
+                            }}
+                          >
+                            <Star size={24} fill={citizenRating >= star ? '#f59e0b' : 'none'} />
+                          </button>
+                        ))}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#166534', marginLeft: '6px' }}>
+                          {citizenRating === 5 ? '5/5 (Excellent)' : citizenRating === 4 ? '4/5 (Good)' : citizenRating === 3 ? '3/5 (Average)' : citizenRating === 2 ? '2/5 (Poor)' : '1/5 (Unsatisfactory)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 2. Resolution Status Selection */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#14532d', marginBottom: '6px' }}>
+                        2. Resolution Status Selection:
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: resolutionChoice === 'fully_resolved' ? '#dcfce7' : 'var(--white)',
+                            border: `1.5px solid ${resolutionChoice === 'fully_resolved' ? '#16a34a' : 'var(--slate-200)'}`,
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: resolutionChoice === 'fully_resolved' ? '#14532d' : 'var(--slate-700)'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="resolutionChoice"
+                            checked={resolutionChoice === 'fully_resolved'}
+                            onChange={() => setResolutionChoice('fully_resolved')}
+                          />
+                          <span>Fully Resolved (Problem Solved)</span>
+                        </label>
+
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: resolutionChoice === 'partially_resolved' ? '#fef3c7' : 'var(--white)',
+                            border: `1.5px solid ${resolutionChoice === 'partially_resolved' ? '#d97706' : 'var(--slate-200)'}`,
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: resolutionChoice === 'partially_resolved' ? '#92400e' : 'var(--slate-700)'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="resolutionChoice"
+                            checked={resolutionChoice === 'partially_resolved'}
+                            onChange={() => setResolutionChoice('partially_resolved')}
+                          />
+                          <span>Partially Resolved</span>
+                        </label>
+
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: resolutionChoice === 'not_resolved' ? '#fee2e2' : 'var(--white)',
+                            border: `1.5px solid ${resolutionChoice === 'not_resolved' ? '#dc2626' : 'var(--slate-200)'}`,
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: resolutionChoice === 'not_resolved' ? '#991b1b' : 'var(--slate-700)'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="resolutionChoice"
+                            checked={resolutionChoice === 'not_resolved'}
+                            onChange={() => setResolutionChoice('not_resolved')}
+                          />
+                          <span>Not Resolved (Problem Exists)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* 3. Optional Citizen Review / Comments */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#14532d', marginBottom: '4px' }}>
+                        3. Citizen Review / Comments (Optional):
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="e.g. Roads paved smoothly and clean debris removal completed on time."
+                        value={citizenComment}
+                        onChange={(e) => setCitizenComment(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-300)', fontSize: '0.8rem' }}
+                      />
+                    </div>
+
+                    {/* 4. Mandatory Dispute Details if Partially or Not Resolved */}
+                    {(resolutionChoice === 'partially_resolved' || resolutionChoice === 'not_resolved') && (
+                      <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', padding: '0.85rem', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#9f1239', marginBottom: '4px' }}>
+                            * Specific Reason for Dispute (Required to Reopen):
+                          </label>
+                          <textarea
+                            rows={2}
+                            required
+                            placeholder="Explain why the repair does not match ground conditions (e.g. patch washed off in rain, debris left uncollected)."
+                            value={disputeReason}
+                            onChange={(e) => setDisputeReason(e.target.value)}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid #fda4af', fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#9f1239', marginBottom: '4px' }}>
+                            Optional Photo Proof URL (Dispute Evidence):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="https://..."
+                            value={disputePhotoUrl}
+                            onChange={(e) => setDisputePhotoUrl(e.target.value)}
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: 'var(--radius-md)', border: '1px solid #fda4af', fontSize: '0.78rem' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 5. Submit Feedback Button */}
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      style={{
+                        background: resolutionChoice === 'fully_resolved' ? '#059669' : '#dc2626',
+                        borderColor: resolutionChoice === 'fully_resolved' ? '#059669' : '#dc2626',
+                        padding: '0.65rem 1rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {resolutionChoice === 'fully_resolved' ? (
+                        <>
+                          <CheckCircle2 size={16} />
+                          <span>Submit Verification & Officially Close Issue</span>
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw size={16} />
+                          <span>Submit Dispute & Reopen Complaint</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* RESOLVED BADGE BANNER */}
+              {incident.status === 'RESOLVED' && (
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #ecfdf5, #f0fdf4)',
+                    border: '1.5px solid #10b981',
+                    padding: '1.15rem',
+                    borderRadius: 'var(--radius-lg)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={22} style={{ color: '#059669' }} />
+                    <h4 style={{ margin: 0, color: '#065f46', fontSize: '1rem', fontWeight: 800 }}>
+                      Issue Officially Closed & Resolved
+                    </h4>
+                    <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, border: '1px solid #86efac' }}>
+                      Officer Verified ✓
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#047857', lineHeight: 1.4 }}>
+                    Thank you! Your feedback has officially closed this issue. Verified quality repairs logged in the public municipal register and showcased in Recently Completed Civic Work.
+                  </p>
+                  {incident.citizenFeedback && (
+                    <div style={{ marginTop: '4px', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', color: '#065f46' }}>
+                      <strong>Citizen Rating:</strong> {incident.citizenFeedback.rating}/5 ★ — "{incident.citizenFeedback.comment || 'Issue confirmed resolved on the ground.'}"
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* REOPENED BANNER */}
+              {incident.escalationState === 'REOPENED' && (
+                <div
+                  style={{
+                    background: '#fef2f2',
+                    border: '1.5px solid #f87171',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-lg)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={20} style={{ color: '#dc2626' }} />
+                    <h4 style={{ margin: 0, color: '#991b1b', fontSize: '0.95rem', fontWeight: 800 }}>
+                      Complaint Reopened
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#b91c1c' }}>
+                    Citizen dispute registered. This work order has been returned to the Officer Command Centre under Pending Work / Reopened for emergency review and corrective action.
+                  </p>
                 </div>
               )}
             </div>

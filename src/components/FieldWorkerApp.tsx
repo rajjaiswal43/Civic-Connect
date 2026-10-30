@@ -26,7 +26,8 @@ import {
   Layers,
   RefreshCw,
   LogOut,
-  X
+  X,
+  Bell
 } from 'lucide-react';
 
 export const FieldWorkerApp: React.FC = () => {
@@ -40,10 +41,12 @@ export const FieldWorkerApp: React.FC = () => {
     workers,
     setIsWorkerAuthModalOpen,
     logoutWorker,
-    playSound
+    playSound,
+    notifications,
+    markNotificationRead
   } = useCivic();
 
-  const [activeTab, setActiveTab] = useState<'assigned' | 'in_progress' | 'completed'>('assigned');
+  const [activeTab, setActiveTab] = useState<'assigned' | 'in_progress' | 'pending' | 'completed' | 'notifications'>('assigned');
   const [selectedTask, setSelectedTask] = useState<CivicIncident | null>(null);
   const [afterPhotoUrl, setAfterPhotoUrl] = useState<string>(CIVIC_PRESET_IMAGES.potholeAfter);
   const [repairNotes, setRepairNotes] = useState<string>(
@@ -65,6 +68,12 @@ export const FieldWorkerApp: React.FC = () => {
   );
   const inProgressTasks = incidents.filter(
     (i) => i.status === 'WORK_STARTED' || i.status === 'IN_PROGRESS' || i.escalationState === 'REOPENED'
+  );
+  const pendingTasks = incidents.filter(
+    (i) =>
+      i.escalationState === 'REOPENED' ||
+      ((i.status === 'ASSIGNED' || i.status === 'WORK_STARTED' || i.status === 'IN_PROGRESS') &&
+        (i.escalationState !== 'NONE' || (i.deadline && new Date(i.deadline).getTime() < Date.now() + 86400000)))
   );
   const completedTasks = incidents.filter(
     (i) => i.status === 'WORK_COMPLETED' || i.status === 'AWAITING_CITIZEN_FEEDBACK' || i.status === 'RESOLVED' || i.status === 'PUBLIC_VERIFY'
@@ -159,17 +168,18 @@ export const FieldWorkerApp: React.FC = () => {
         </div>
       </div>
 
-      {/* TABS FOR ASSIGNED / IN PROGRESS / COMPLETED */}
-      <div style={{ display: 'flex', background: 'var(--slate-200)', padding: '4px', borderRadius: 'var(--radius-lg)' }}>
+      {/* 5 TABS FOR FIELD WORKER DASHBOARD (Section 5) */}
+      <div style={{ display: 'flex', background: 'var(--slate-200)', padding: '4px', borderRadius: 'var(--radius-lg)', overflowX: 'auto', gap: '4px' }}>
         <button
           onClick={() => setActiveTab('assigned')}
           style={{
             flex: 1,
             padding: '0.65rem',
             borderRadius: 'var(--radius-md)',
-            fontSize: '0.82rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: 'none',
+            whiteSpace: 'nowrap',
             background: activeTab === 'assigned' ? 'var(--white)' : 'transparent',
             color: activeTab === 'assigned' ? 'var(--slate-900)' : 'var(--slate-600)',
             boxShadow: activeTab === 'assigned' ? 'var(--shadow-xs)' : 'none',
@@ -180,10 +190,8 @@ export const FieldWorkerApp: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          <span>Assigned Work Orders</span>
-          <span style={{ background: 'var(--amber-100)', color: 'var(--amber-800)', fontSize: '0.7rem', padding: '1px 6px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
-            {assignedTasks.length}
-          </span>
+          <HardHat size={14} />
+          <span>1. Assigned Tasks ({assignedTasks.length})</span>
         </button>
 
         <button
@@ -192,9 +200,10 @@ export const FieldWorkerApp: React.FC = () => {
             flex: 1,
             padding: '0.65rem',
             borderRadius: 'var(--radius-md)',
-            fontSize: '0.82rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: 'none',
+            whiteSpace: 'nowrap',
             background: activeTab === 'in_progress' ? 'var(--white)' : 'transparent',
             color: activeTab === 'in_progress' ? 'var(--slate-900)' : 'var(--slate-600)',
             boxShadow: activeTab === 'in_progress' ? 'var(--shadow-xs)' : 'none',
@@ -205,10 +214,32 @@ export const FieldWorkerApp: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          <span>Work in Progress (On-Site)</span>
-          <span style={{ background: 'var(--civic-100)', color: 'var(--civic-800)', fontSize: '0.7rem', padding: '1px 6px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
-            {inProgressTasks.length}
-          </span>
+          <Play size={14} />
+          <span>2. Work Started ({inProgressTasks.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('pending')}
+          style={{
+            flex: 1,
+            padding: '0.65rem',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            border: 'none',
+            whiteSpace: 'nowrap',
+            background: activeTab === 'pending' ? 'var(--white)' : 'transparent',
+            color: activeTab === 'pending' ? '#b45309' : 'var(--slate-600)',
+            boxShadow: activeTab === 'pending' ? 'var(--shadow-xs)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          <Clock size={14} />
+          <span>3. Pending Tasks ({pendingTasks.length})</span>
         </button>
 
         <button
@@ -217,11 +248,12 @@ export const FieldWorkerApp: React.FC = () => {
             flex: 1,
             padding: '0.65rem',
             borderRadius: 'var(--radius-md)',
-            fontSize: '0.82rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: 'none',
+            whiteSpace: 'nowrap',
             background: activeTab === 'completed' ? 'var(--white)' : 'transparent',
-            color: activeTab === 'completed' ? 'var(--slate-900)' : 'var(--slate-600)',
+            color: activeTab === 'completed' ? '#047857' : 'var(--slate-600)',
             boxShadow: activeTab === 'completed' ? 'var(--shadow-xs)' : 'none',
             display: 'flex',
             alignItems: 'center',
@@ -230,10 +262,32 @@ export const FieldWorkerApp: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          <span>Completion Proof Submitted</span>
-          <span style={{ background: 'var(--emerald-100)', color: 'var(--emerald-800)', fontSize: '0.7rem', padding: '1px 6px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
-            {completedTasks.length}
-          </span>
+          <CheckCircle2 size={14} />
+          <span>4. Completed Tasks ({completedTasks.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('notifications')}
+          style={{
+            flex: 1,
+            padding: '0.65rem',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            border: 'none',
+            whiteSpace: 'nowrap',
+            background: activeTab === 'notifications' ? 'var(--white)' : 'transparent',
+            color: activeTab === 'notifications' ? 'var(--civic-600)' : 'var(--slate-600)',
+            boxShadow: activeTab === 'notifications' ? 'var(--shadow-xs)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          <Bell size={14} />
+          <span>5. Notifications ({notifications.filter((n) => n.unread).length})</span>
         </button>
       </div>
 
@@ -401,6 +455,127 @@ export const FieldWorkerApp: React.FC = () => {
                 <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', background: 'var(--slate-50)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
                   <strong>Logged by Squad:</strong> {task.workerNotes || 'Repairs validated.'}
                 </div>
+              </div>
+            ))
+          )
+        )}
+
+        {/* TAB 3: PENDING TASKS */}
+        {activeTab === 'pending' && (
+          pendingTasks.length === 0 ? (
+            <div style={{ background: 'var(--white)', padding: '2.5rem', textAlign: 'center', borderRadius: 'var(--radius-lg)', border: '1px solid var(--slate-200)' }}>
+              <Clock size={32} style={{ color: 'var(--slate-300)', marginBottom: '8px' }} />
+              <h4 style={{ margin: 0, color: 'var(--slate-700)', fontWeight: 700 }}>No Pending Escalations</h4>
+              <p style={{ color: 'var(--slate-500)', fontSize: '0.8rem', margin: '4px 0 0 0' }}>All assigned work orders are operating within municipal SLA thresholds.</p>
+            </div>
+          ) : (
+            pendingTasks.map((task) => {
+              const countdown = getDeadlineCountdown(task.deadline, task.deadlineTimestamp);
+              return (
+                <div key={task.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #d97706' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
+                        PENDING / OVERDUE #{task.id}
+                      </span>
+                      {task.escalationState === 'REOPENED' && (
+                        <span style={{ fontSize: '0.7rem', background: '#fee2e2', color: '#b91c1c', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
+                          ⚠️ Reopened by Citizen
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: countdown.badgeColor }}>
+                      {countdown.label}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-900)', margin: '4px 0' }}>
+                    {task.title}
+                  </h3>
+
+                  <p style={{ fontSize: '0.78rem', color: 'var(--slate-600)', margin: '4px 0 0.75rem 0' }}>
+                    <MapPin size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />
+                    {task.location.address}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid var(--slate-200)', paddingTop: '0.75rem' }}>
+                    {task.status === 'ASSIGNED' ? (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleStartTask(task.id)}
+                        style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                      >
+                        <Play size={13} /> Immediate Start On-Site
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleOpenProofModal(task)}
+                        style={{ fontSize: '0.75rem', fontWeight: 700, background: '#059669', borderColor: '#059669' }}
+                      >
+                        <Camera size={13} /> Complete & Upload Repair Proof
+                      </button>
+                    )}
+
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSelectedIncident(task)}
+                      style={{ fontSize: '0.75rem' }}
+                    >
+                      Inspect Full Ticket
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )
+        )}
+
+        {/* TAB 5: NOTIFICATIONS */}
+        {activeTab === 'notifications' && (
+          notifications.length === 0 ? (
+            <div style={{ background: 'var(--white)', padding: '2.5rem', textAlign: 'center', borderRadius: 'var(--radius-lg)', border: '1px solid var(--slate-200)' }}>
+              <Bell size={32} style={{ color: 'var(--slate-300)', marginBottom: '8px' }} />
+              <h4 style={{ margin: 0, color: 'var(--slate-700)', fontWeight: 700 }}>No Notifications</h4>
+              <p style={{ color: 'var(--slate-500)', fontSize: '0.8rem', margin: '4px 0 0 0' }}>You have received no new dispatch messages.</p>
+            </div>
+          ) : (
+            notifications.map((notif) => (
+              <div
+                key={notif.id}
+                onClick={() => {
+                  markNotificationRead(notif.id);
+                  const inc = incidents.find((i) => i.id === notif.incidentId);
+                  if (inc) setSelectedIncident(inc);
+                }}
+                style={{
+                  background: notif.unread ? '#eff6ff' : 'var(--white)',
+                  border: `1px solid ${notif.unread ? '#93c5fd' : 'var(--slate-200)'}`,
+                  padding: '1rem',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--slate-900)' }}>
+                      {notif.title}
+                    </span>
+                    {notif.unread && (
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--civic-600)' }} />
+                    )}
+                  </div>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--slate-600)' }}>
+                    {notif.message}
+                  </p>
+                </div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--slate-400)', whiteSpace: 'nowrap' }}>
+                  {notif.timestamp}
+                </span>
               </div>
             ))
           )

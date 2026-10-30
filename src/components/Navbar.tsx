@@ -68,18 +68,29 @@ export const Navbar: React.FC = () => {
 
   const handleNavClick = (tab: string) => {
     setActiveTab(tab);
-    if (tab === 'citizen') {
-      setCurrentRole('citizen');
-    } else if (tab === 'officer') {
-      setCurrentRole('officer');
-      // If not authenticated, prompt login
-      if (!authenticatedOfficer) {
-        setIsOfficerAuthModalOpen(true);
-      }
-    } else if (tab === 'worker') {
-      setCurrentRole('worker');
-      if (!authenticatedWorker) {
-        setIsWorkerAuthModalOpen(true);
+    if (typeof window !== 'undefined') {
+      if (tab === 'citizen') {
+        setCurrentRole('citizen');
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (tab === 'officer') {
+        setCurrentRole('officer');
+        if (authenticatedOfficer) {
+          window.history.pushState({}, '', '/officer/dashboard');
+        } else {
+          window.history.pushState({}, '', '/officer/login');
+        }
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (tab === 'worker') {
+        setCurrentRole('worker');
+        window.history.pushState({}, '', '/worker');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (tab === 'analytics') {
+        window.history.pushState({}, '', '/analytics');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (tab === 'audit') {
+        window.history.pushState({}, '', '/audit');
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }
     }
   };
@@ -214,7 +225,13 @@ export const Navbar: React.FC = () => {
             ) : (
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => setIsOfficerAuthModalOpen(true)}
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.history.pushState({}, '', '/officer/login');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }
+                  setActiveTab('officer');
+                }}
                 style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <LogIn size={14} />

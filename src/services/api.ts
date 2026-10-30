@@ -12,6 +12,45 @@ export const apiClient = {
     }
   },
 
+  async officerLogin(name: string, mobile: string, password: string, rememberMe = false) {
+    const res = await fetch(`${API_BASE}/admin/officer/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mobile, password, rememberMe })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Authentication failed. Please verify credentials.');
+    }
+    return data;
+  },
+
+  async officerChangePassword(officerId: string, currentPassword: string, newPassword: string) {
+    const res = await fetch(`${API_BASE}/admin/officer/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ officerId, currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Password change failed.');
+    }
+    return data;
+  },
+
+  async officerRegister(payload: any) {
+    const res = await fetch(`${API_BASE}/admin/officer/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Officer registration failed.');
+    }
+    return data;
+  },
+
   async getOfficerProfile(): Promise<OfficerProfile | null> {
     try {
       const res = await fetch(`${API_BASE}/admin/officer`);
@@ -60,30 +99,44 @@ export const apiClient = {
     return null;
   },
 
-  async validateIncident(incidentId: string, action: string, impactRating: number, comment?: string) {
+  async approveIncident(incidentId: string, officerNotes?: string, overrideCategory?: string, overrideDepartment?: string) {
     try {
-      const res = await fetch(`${API_BASE}/incidents/${incidentId}/validate`, {
+      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, impactRating, comment })
+        body: JSON.stringify({ officerNotes, overrideCategory, overrideDepartment })
       });
       if (res.ok) return await res.json();
     } catch (e) {
-      console.warn('API validateIncident error:', e);
+      console.warn('API approveIncident error:', e);
     }
     return null;
   },
 
-  async acknowledgeIncident(incidentId: string, deadline: string, officerNotes?: string, overrideDepartment?: string) {
+  async rejectIncident(incidentId: string, rejectionReason: string) {
     try {
-      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/acknowledge`, {
+      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deadline, officerNotes, overrideDepartment })
+        body: JSON.stringify({ rejectionReason })
       });
       if (res.ok) return await res.json();
     } catch (e) {
-      console.warn('API acknowledgeIncident error:', e);
+      console.warn('API rejectIncident error:', e);
+    }
+    return null;
+  },
+
+  async requestMoreInfo(incidentId: string, requestNotes: string) {
+    try {
+      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/request-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestNotes })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API requestMoreInfo error:', e);
     }
     return null;
   },
@@ -102,16 +155,16 @@ export const apiClient = {
     return null;
   },
 
-  async overrideAi(incidentId: string, payload: any) {
+  async extendDeadline(incidentId: string, newDeadline: string, reason: string) {
     try {
-      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/override`, {
+      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/extend-deadline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ newDeadline, reason })
       });
       if (res.ok) return await res.json();
     } catch (e) {
-      console.warn('API overrideAi error:', e);
+      console.warn('API extendDeadline error:', e);
     }
     return null;
   },
@@ -144,16 +197,44 @@ export const apiClient = {
     return null;
   },
 
-  async citizenClosureFeedback(incidentId: string, isSatisfied: boolean, feedbackNotes?: string) {
+  async verifyCompletedWork(incidentId: string, action: 'approve' | 'reject' | 'request_rework' = 'approve', notes?: string) {
+    try {
+      const res = await fetch(`${API_BASE}/admin/incidents/${incidentId}/verify-completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, notes })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API verifyCompletedWork error:', e);
+    }
+    return null;
+  },
+
+  async citizenClosureFeedback(incidentId: string, isSatisfied: boolean, rating = 5, feedbackNotes?: string) {
     try {
       const res = await fetch(`${API_BASE}/incidents/${incidentId}/closure-feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isSatisfied, feedbackNotes })
+        body: JSON.stringify({ isSatisfied, rating, feedbackNotes })
       });
       if (res.ok) return await res.json();
     } catch (e) {
       console.warn('API citizenClosureFeedback error:', e);
+    }
+    return null;
+  },
+
+  async validateIncident(incidentId: string, action: string, impactRating: number, comment?: string) {
+    try {
+      const res = await fetch(`${API_BASE}/incidents/${incidentId}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, impactRating, comment })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API validateIncident error:', e);
     }
     return null;
   },
@@ -182,4 +263,3 @@ export const apiClient = {
     }
   }
 };
-

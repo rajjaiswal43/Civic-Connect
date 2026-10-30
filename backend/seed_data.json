@@ -1,0 +1,784 @@
+{
+  "incidents": [
+    {
+      "id": "CC-1042",
+      "title": "Hazardous deep pothole near Knowledge Park 3 Gate 2",
+      "description": "Large 40cm pothole right on the primary college road near Gate 2 causing extreme vehicle swerving and two-wheeler skid risk.",
+      "category": "Pothole",
+      "status": "ASSIGNED",
+      "escalationState": "NONE",
+      "priorityLevel": "HIGH",
+      "priorityScore": 86,
+      "priorityBreakdown": {
+        "severity": 26,
+        "publicImpact": 18,
+        "vulnerability": 14,
+        "corroboration": 14,
+        "persistence": 6,
+        "locationContext": 8,
+        "totalScore": 86
+      },
+      "location": {
+        "lat": 28.4632,
+        "lng": 77.4912,
+        "address": "Knowledge Park III, Institutional Area, Greater Noida, UP 201310",
+        "ward": "Ward 12",
+        "landmark": "Opposite GCET College Gate 2 & Sharda University crossing",
+        "hotspotZone": "Knowledge Park Student Transit Corridor",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80",
+        "afterPhotoUrl": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "18 Aug 2026, 09:42 AM",
+        "gpsVerified": true,
+        "provenance": "live_camera",
+        "hasVoiceNote": true,
+        "voiceTranscript": "कॉलेज के गेट के सामने बहुत बड़ा गड्ढा हो गया है, दो पहिया वाहन फिसल रहे हैं। (Large pothole in front of college gate, two-wheelers skidding.)",
+        "deviceMetadata": {
+          "device": "Realme 11 Pro / Android 14",
+          "accuracyMeters": 3.2,
+          "tamperCheckPassed": true,
+          "sha256Hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "aiMetadata": {
+        "classification": "Pothole / Severe Road Depression",
+        "confidence": 94,
+        "evidenceRelevance": 98,
+        "duplicateClusterProbability": 91,
+        "modelVersion": "CivicVision-v1.4b (YOLO-v9 + PostGIS)",
+        "suggestedDepartment": "Road Maintenance",
+        "suggestedWard": "Ward 12",
+        "reasonCodes": [
+          "High severity pavement failure (>35cm depth estimate)",
+          "High transit density (University corridor >12,000 daily commuters)",
+          "Pedestrian & two-wheeler accident vulnerability zone",
+          "Multiple corroborating citizen reports clustered within 100m radius",
+          "Monsoon water-logging risk factor active"
+        ],
+        "duplicateClusterId": "CLUSTER-KP3-ROAD-042"
+      },
+      "linkedReports": [
+        {
+          "id": "CC-1047",
+          "reporterMasked": "Rohit S. (+91 98*** 1290)",
+          "distanceMeters": 48,
+          "reportedAgo": "2 hours ago",
+          "photoUrl": "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=75",
+          "description": "Dangerous pothole near the bus stand right in the middle of road.",
+          "timestamp": "18 Aug 2026, 10:15 AM",
+          "provenance": "live_camera"
+        },
+        {
+          "id": "CC-1051",
+          "reporterMasked": "Dr. Ananya P. (+91 97*** 4481)",
+          "distanceMeters": 71,
+          "reportedAgo": "4 hours ago",
+          "photoUrl": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=75",
+          "description": "Road broken near the college turn. Needs immediate cold mix patch.",
+          "timestamp": "18 Aug 2026, 08:30 AM",
+          "provenance": "live_camera"
+        },
+        {
+          "id": "CC-1055",
+          "reporterMasked": "Manish G. (+91 99*** 0032)",
+          "distanceMeters": 93,
+          "reportedAgo": "5 hours ago",
+          "photoUrl": "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=75",
+          "description": "Major road crater causing traffic bottleneck every morning.",
+          "timestamp": "18 Aug 2026, 07:15 AM",
+          "provenance": "live_camera"
+        }
+      ],
+      "communityConfirmations": 23,
+      "communityDisagreements": 0,
+      "averageImpactRating": 4.8,
+      "validationsList": [
+        {
+          "id": "val-1",
+          "userIdMasked": "Aarav M. (Ward 12 Resident)",
+          "action": "confirmed_exists",
+          "impactRating": 5,
+          "comment": "School bus was forced to brake hard right here today morning.",
+          "timestamp": "18 Aug 2026, 10:00 AM"
+        },
+        {
+          "id": "val-2",
+          "userIdMasked": "Priya K. (Commuter)",
+          "action": "confirmed_exists",
+          "impactRating": 5,
+          "comment": "Water accumulates inside when it rains, making it invisible to bikes.",
+          "timestamp": "18 Aug 2026, 10:15 AM"
+        }
+      ],
+      "department": "Road Maintenance",
+      "assignedWorker": {
+        "id": "w-1",
+        "name": "Amit Kumar",
+        "role": "Senior Field Technician",
+        "phone": "+91 98712 45890",
+        "department": "Road Maintenance",
+        "team": "Rapid Pothole Patching Squad A",
+        "currentTasksCount": 2,
+        "equipment": [
+          "Bituminous Cold Mix Applicator",
+          "Vibratory Plate Compactor",
+          "Laser Leveler",
+          "Safety Barricades"
+        ]
+      },
+      "deadline": "18 Aug 2026, 06:00 PM",
+      "slaHoursRemaining": 6,
+      "isSlaAtRisk": false,
+      "officerNotes": "Assigned to Rapid Pothole Patching Squad A. Materials dispatched from Alpha Asphalt Depot.",
+      "workerNotes": "Bituminous cold mix compaction scheduled for 03:30 PM.",
+      "materialsLogged": "50kg Bitumen Cold Mix Type II, Bituminous Emulsion RS-1 (10L)",
+      "createdAt": "18 Aug 2026, 09:45 AM",
+      "updatedAt": "18 Aug 2026, 10:20 AM",
+      "auditLogs": [
+        {
+          "id": "log-1",
+          "timestamp": "18 Aug 2026, 09:42 AM",
+          "actor": "Citizen (Raj Jaiswal / Priya S.)",
+          "role": "Citizen",
+          "action": "Report Submitted",
+          "details": "Initial report submitted via Mobile PWA with verified GPS telemetry (28.4632, 77.4912) and optical proof.",
+          "sha256Hash": "a8f5c3d1e9b2...8472"
+        },
+        {
+          "id": "log-2",
+          "timestamp": "18 Aug 2026, 09:43 AM",
+          "actor": "AI Vision Pipeline",
+          "role": "AI System (v1.4b)",
+          "action": "AI Classification & Validation",
+          "details": "Category verified as \"Pothole / Road Damage\" (Confidence: 94%, Evidence Relevance: 98%). Explainable priority score: 86/100.",
+          "modelVersion": "CivicVision-v1.4b",
+          "confidence": 94,
+          "sha256Hash": "b4e2f9d8a1c3...9014"
+        },
+        {
+          "id": "log-3",
+          "timestamp": "18 Aug 2026, 09:44 AM",
+          "actor": "GIS Clustering Engine",
+          "role": "AI System (v1.4b)",
+          "action": "Duplicate Cluster Consolidated",
+          "details": "3 nearby reports (#CC-1047, #CC-1051, #CC-1055) linked to Master Incident #CC-1042 using spatio-temporal radius (100m / 6h window).",
+          "sha256Hash": "c7d1e4b8a2f9...1123"
+        },
+        {
+          "id": "log-4",
+          "timestamp": "18 Aug 2026, 10:18 AM",
+          "actor": "Officer R. B. Chauhan",
+          "role": "Municipal Officer",
+          "action": "Work Order Generated & Dispatched",
+          "details": "Officer accepted AI recommendation. Work order #WO-KP-902 dispatched to Road Maintenance Squad A (Amit Kumar). SLA set to 6 hours.",
+          "sha256Hash": "d3f9b2a1c8e4...4456"
+        }
+      ]
+    },
+    {
+      "id": "CC-1043",
+      "title": "Overflowing commercial waste bin near Pari Chowk Bus Terminal",
+      "description": "Waste container overflowing onto pedestrian walkway. Stray cattle and foul odor disrupting commuter boarding.",
+      "category": "Garbage",
+      "status": "PUBLIC",
+      "escalationState": "NONE",
+      "priorityLevel": "MEDIUM",
+      "priorityScore": 68,
+      "priorityBreakdown": {
+        "severity": 16,
+        "publicImpact": 18,
+        "vulnerability": 10,
+        "corroboration": 12,
+        "persistence": 6,
+        "locationContext": 6,
+        "totalScore": 68
+      },
+      "location": {
+        "lat": 28.4735,
+        "lng": 77.5028,
+        "address": "Pari Chowk Central Roundabout, Sector Alpha 1, Greater Noida",
+        "ward": "Ward 8",
+        "landmark": "Near Noida Metro Aqua Line Station Exit 2",
+        "hotspotZone": "Pari Chowk Transit Hub",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1605600659908-0ef719419d41?auto=format&fit=crop&w=800&q=80",
+        "afterPhotoUrl": "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "18 Aug 2026, 07:30 AM",
+        "gpsVerified": true,
+        "provenance": "live_camera"
+      },
+      "aiMetadata": {
+        "classification": "Solid Waste / Commercial Dump",
+        "confidence": 91,
+        "evidenceRelevance": 96,
+        "duplicateClusterProbability": 75,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Sanitation & Solid Waste",
+        "suggestedWard": "Ward 8",
+        "reasonCodes": [
+          "Transit hub high footfall",
+          "Obstruction of public sidewalk"
+        ]
+      },
+      "linkedReports": [],
+      "communityConfirmations": 15,
+      "communityDisagreements": 1,
+      "averageImpactRating": 3.9,
+      "validationsList": [],
+      "department": "Sanitation & Solid Waste",
+      "assignedWorker": {
+        "id": "w-3",
+        "name": "Suresh Nagar",
+        "role": "Sanitation Inspector",
+        "phone": "+91 97188 90123",
+        "department": "Sanitation & Solid Waste",
+        "team": "Heavy Waste Clearance Unit",
+        "currentTasksCount": 1,
+        "equipment": [
+          "Hydraulic Dumper Placer",
+          "Mechanical Road Sweeper",
+          "Disinfectant Spray Unit"
+        ]
+      },
+      "slaHoursRemaining": 18,
+      "isSlaAtRisk": false,
+      "createdAt": "18 Aug 2026, 07:32 AM",
+      "updatedAt": "18 Aug 2026, 08:00 AM",
+      "auditLogs": [
+        {
+          "id": "log-10",
+          "timestamp": "18 Aug 2026, 07:32 AM",
+          "actor": "Citizen (Vikas M.)",
+          "role": "Citizen",
+          "action": "Report Submitted",
+          "details": "Garbage accumulation photo submitted."
+        }
+      ]
+    },
+    {
+      "id": "CC-1044",
+      "title": "High-mast LED light failure on Sector Alpha 1 Main Market Spine",
+      "description": "Complete blackout of 4 consecutive LED poles creating dark stretch and safety concern for evening shoppers.",
+      "category": "Streetlight",
+      "status": "IN_PROGRESS",
+      "escalationState": "NONE",
+      "priorityLevel": "HIGH",
+      "priorityScore": 82,
+      "priorityBreakdown": {
+        "severity": 22,
+        "publicImpact": 18,
+        "vulnerability": 15,
+        "corroboration": 14,
+        "persistence": 5,
+        "locationContext": 8,
+        "totalScore": 82
+      },
+      "location": {
+        "lat": 28.4791,
+        "lng": 77.5134,
+        "address": "Alpha 1 Commercial Belt, Market Corridor, Greater Noida",
+        "ward": "Ward 8",
+        "landmark": "Near Alpha 1 Central Post Office",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
+        "afterPhotoUrl": "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "17 Aug 2026, 08:15 PM",
+        "gpsVerified": true,
+        "provenance": "live_camera"
+      },
+      "aiMetadata": {
+        "classification": "Streetlight / Multi-Pole Circuit Fault",
+        "confidence": 96,
+        "evidenceRelevance": 95,
+        "duplicateClusterProbability": 84,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Electrical & Lighting",
+        "suggestedWard": "Ward 8",
+        "reasonCodes": [
+          "Women safety priority area",
+          "Market public space dark zone"
+        ]
+      },
+      "linkedReports": [],
+      "communityConfirmations": 31,
+      "communityDisagreements": 0,
+      "averageImpactRating": 4.6,
+      "validationsList": [],
+      "department": "Electrical & Lighting",
+      "assignedWorker": {
+        "id": "w-2",
+        "name": "Rajesh Verma",
+        "role": "Electrical Supervisor",
+        "phone": "+91 98110 33412",
+        "department": "Electrical & Lighting",
+        "team": "Zone 2 Streetlight Rapid Squad",
+        "currentTasksCount": 3,
+        "equipment": [
+          "Hydraulic Bucket Truck (15m)",
+          "Multimeter & Cable Fault Locator",
+          "LED Fixture Replacements"
+        ]
+      },
+      "deadline": "18 Aug 2026, 02:00 PM",
+      "slaHoursRemaining": 4,
+      "isSlaAtRisk": false,
+      "createdAt": "17 Aug 2026, 08:20 PM",
+      "updatedAt": "18 Aug 2026, 09:00 AM",
+      "auditLogs": [
+        {
+          "id": "log-20",
+          "timestamp": "18 Aug 2026, 09:00 AM",
+          "actor": "Field Worker (Rajesh Verma)",
+          "role": "Field Worker",
+          "action": "Repair Started",
+          "details": "Technician reached site with bucket truck. Transformer line diagnostic in progress."
+        }
+      ]
+    },
+    {
+      "id": "CC-1045",
+      "title": "Potable water distribution pipeline leak flooding road in Delta 1",
+      "description": "High pressure drinking water pipe ruptured underneath road surface, water gushing onto residential road and wasting treated supply.",
+      "category": "Water Leakage",
+      "status": "WORK_COMPLETED",
+      "escalationState": "NONE",
+      "priorityLevel": "CRITICAL",
+      "priorityScore": 92,
+      "priorityBreakdown": {
+        "severity": 28,
+        "publicImpact": 16,
+        "vulnerability": 14,
+        "corroboration": 14,
+        "persistence": 10,
+        "locationContext": 10,
+        "totalScore": 92
+      },
+      "location": {
+        "lat": 28.4892,
+        "lng": 77.5218,
+        "address": "Delta 1, Sector Road B-Block, Greater Noida",
+        "ward": "Ward 7",
+        "landmark": "Near Delta 1 Community Health Centre",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1584467735815-f778f274e296?auto=format&fit=crop&w=800&q=80",
+        "afterPhotoUrl": "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "17 Aug 2026, 03:00 PM",
+        "gpsVerified": true,
+        "provenance": "live_camera"
+      },
+      "aiMetadata": {
+        "classification": "Water Main Line Rupture",
+        "confidence": 97,
+        "evidenceRelevance": 99,
+        "duplicateClusterProbability": 60,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Water Supply & Pipelines",
+        "suggestedWard": "Ward 7",
+        "reasonCodes": [
+          "Precious resource loss",
+          "Road sub-base erosion risk",
+          "Hospital proximity"
+        ]
+      },
+      "linkedReports": [],
+      "communityConfirmations": 42,
+      "communityDisagreements": 0,
+      "averageImpactRating": 4.9,
+      "validationsList": [],
+      "department": "Water Supply & Pipelines",
+      "assignedWorker": {
+        "id": "w-5",
+        "name": "Dinesh Chandra",
+        "role": "Water Works Foreman",
+        "phone": "+91 98101 77654",
+        "department": "Water Supply & Pipelines",
+        "team": "High-Pressure Pipeline Response",
+        "currentTasksCount": 1,
+        "equipment": [
+          "Ductile Iron Pipe Cutters",
+          "Electrofusion Welding Rig",
+          "Ultrasonic Flow Leak Detector"
+        ]
+      },
+      "deadline": "18 Aug 2026, 11:00 AM",
+      "slaHoursRemaining": 1,
+      "isSlaAtRisk": false,
+      "createdAt": "17 Aug 2026, 03:15 PM",
+      "updatedAt": "18 Aug 2026, 08:30 AM",
+      "auditLogs": [
+        {
+          "id": "log-30",
+          "timestamp": "18 Aug 2026, 08:30 AM",
+          "actor": "Field Worker (Dinesh Chandra)",
+          "role": "Field Worker",
+          "action": "Completion Proof Uploaded",
+          "details": "Cast iron pipe replacement completed and pressure tested at 4.2 bar. After-photo uploaded with verified GPS tag."
+        }
+      ]
+    },
+    {
+      "id": "CC-1046",
+      "title": "Monsoon storm drain desilting completed at Beta 2 Market Ring",
+      "description": "Blocked drain chamber cleared of plastic debris and silt buildup to prevent monsoon inundation.",
+      "category": "Drainage",
+      "status": "RESOLVED",
+      "escalationState": "NONE",
+      "priorityLevel": "MEDIUM",
+      "priorityScore": 64,
+      "priorityBreakdown": {
+        "severity": 16,
+        "publicImpact": 16,
+        "vulnerability": 10,
+        "corroboration": 10,
+        "persistence": 6,
+        "locationContext": 6,
+        "totalScore": 64
+      },
+      "location": {
+        "lat": 28.471,
+        "lng": 77.498,
+        "address": "Sector Beta 2 Central Plaza, Greater Noida",
+        "ward": "Ward 4",
+        "landmark": "Near Beta 2 Shopping Complex",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=800&q=80",
+        "afterPhotoUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "15 Aug 2026, 11:00 AM",
+        "gpsVerified": true,
+        "provenance": "live_camera"
+      },
+      "aiMetadata": {
+        "classification": "Stormwater Drainage Siltation",
+        "confidence": 93,
+        "evidenceRelevance": 94,
+        "duplicateClusterProbability": 40,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Drainage & Sewerage",
+        "suggestedWard": "Ward 4",
+        "reasonCodes": [
+          "Pre-monsoon preparedness schedule"
+        ]
+      },
+      "linkedReports": [],
+      "communityConfirmations": 19,
+      "communityDisagreements": 0,
+      "averageImpactRating": 4.2,
+      "validationsList": [],
+      "department": "Drainage & Sewerage",
+      "assignedWorker": {
+        "id": "w-4",
+        "name": "Pooja Sharma",
+        "role": "Civil Sub-Engineer",
+        "phone": "+91 99532 11980",
+        "department": "Drainage & Sewerage",
+        "team": "Monsoon Desilting & Manhole Crew",
+        "currentTasksCount": 2,
+        "equipment": [
+          "Super Sucker Jetting Machine",
+          "Gas Detector",
+          "Cast Iron Manhole Replacement Frames"
+        ]
+      },
+      "slaHoursRemaining": 0,
+      "isSlaAtRisk": false,
+      "createdAt": "15 Aug 2026, 11:15 AM",
+      "updatedAt": "16 Aug 2026, 04:30 PM",
+      "auditLogs": [
+        {
+          "id": "log-40",
+          "timestamp": "16 Aug 2026, 05:00 PM",
+          "actor": "Citizen (Priya S.)",
+          "role": "Citizen",
+          "action": "Citizen Final Verification Passed",
+          "details": "Citizen inspected desilted chamber on mobile PWA and marked issue as successfully resolved."
+        }
+      ]
+    },
+    {
+      "id": "CC-1048",
+      "title": "Irregular ground depression / unidentified debris near Sector 62 Link",
+      "description": "Uneven ground surface with partial cement tiles scattered. Unclear whether civil road defect or private builder material.",
+      "category": "Footpath",
+      "status": "SUBMITTED",
+      "escalationState": "NEEDS_REVIEW",
+      "priorityLevel": "LOW",
+      "priorityScore": 52,
+      "priorityBreakdown": {
+        "severity": 12,
+        "publicImpact": 12,
+        "vulnerability": 8,
+        "corroboration": 6,
+        "persistence": 6,
+        "locationContext": 8,
+        "totalScore": 52
+      },
+      "location": {
+        "lat": 28.455,
+        "lng": 77.485,
+        "address": "Knowledge Park II Outer Service Lane, Greater Noida",
+        "ward": "Ward 12",
+        "landmark": "Near Metro Pillar 188",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "18 Aug 2026, 06:10 AM",
+        "gpsVerified": true,
+        "provenance": "gallery_upload"
+      },
+      "aiMetadata": {
+        "classification": "Ambiguous Surface Disruption",
+        "confidence": 54,
+        "evidenceRelevance": 62,
+        "duplicateClusterProbability": 25,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Civil Infrastructure (Unconfirmed)",
+        "suggestedWard": "Ward 12",
+        "reasonCodes": [
+          "⚠️ Low confidence (54%) below automated routing threshold (75%)",
+          "Obscured optical view / mixed material footprint",
+          "Mandatory Human Officer Review required before assignment"
+        ],
+        "isLowConfidence": true
+      },
+      "linkedReports": [],
+      "communityConfirmations": 3,
+      "communityDisagreements": 1,
+      "averageImpactRating": 2.5,
+      "validationsList": [],
+      "department": "Pending Officer Triage",
+      "slaHoursRemaining": 24,
+      "isSlaAtRisk": false,
+      "createdAt": "18 Aug 2026, 06:15 AM",
+      "updatedAt": "18 Aug 2026, 06:15 AM",
+      "auditLogs": [
+        {
+          "id": "log-50",
+          "timestamp": "18 Aug 2026, 06:15 AM",
+          "actor": "AI Vision Pipeline",
+          "role": "AI System (v1.4b)",
+          "action": "Flagged for Human Review",
+          "details": "Confidence (54%) below 75% threshold. Automated dispatch paused; routed to Officer Manual Review Queue."
+        }
+      ]
+    },
+    {
+      "id": "CC-1050",
+      "title": "CRITICAL: Missing manhole cover on main traffic carriageway near Surajpur",
+      "description": "Uncovered 3-foot sewer chamber in middle of active vehicle lane without warning barricade.",
+      "category": "Drainage",
+      "status": "ASSIGNED",
+      "escalationState": "OVERDUE",
+      "priorityLevel": "CRITICAL",
+      "priorityScore": 98,
+      "priorityBreakdown": {
+        "severity": 30,
+        "publicImpact": 20,
+        "vulnerability": 15,
+        "corroboration": 15,
+        "persistence": 8,
+        "locationContext": 10,
+        "totalScore": 98
+      },
+      "location": {
+        "lat": 28.512,
+        "lng": 77.49,
+        "address": "Surajpur Main Highway Road near Collectorate, Greater Noida",
+        "ward": "Ward 15",
+        "landmark": "Opposite District Court Complex",
+        "isPublicSafePrecision": true
+      },
+      "evidence": {
+        "beforePhotoUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=800&q=80",
+        "photoTimestamp": "18 Aug 2026, 05:00 AM",
+        "gpsVerified": true,
+        "provenance": "live_camera"
+      },
+      "aiMetadata": {
+        "classification": "High-Hazard Manhole Void",
+        "confidence": 98,
+        "evidenceRelevance": 99,
+        "duplicateClusterProbability": 88,
+        "modelVersion": "CivicVision-v1.4b",
+        "suggestedDepartment": "Drainage & Sewerage",
+        "suggestedWard": "Ward 15",
+        "reasonCodes": [
+          "Immediate fatal hazard risk",
+          "Heavy arterial traffic corridor",
+          "Emergency barricading dispatched"
+        ]
+      },
+      "linkedReports": [],
+      "communityConfirmations": 58,
+      "communityDisagreements": 0,
+      "averageImpactRating": 5,
+      "validationsList": [],
+      "department": "Drainage & Sewerage",
+      "assignedWorker": {
+        "id": "w-4",
+        "name": "Pooja Sharma",
+        "role": "Civil Sub-Engineer",
+        "phone": "+91 99532 11980",
+        "department": "Drainage & Sewerage",
+        "team": "Monsoon Desilting & Manhole Crew",
+        "currentTasksCount": 2,
+        "equipment": [
+          "Super Sucker Jetting Machine",
+          "Gas Detector",
+          "Cast Iron Manhole Replacement Frames"
+        ]
+      },
+      "deadline": "18 Aug 2026, 08:00 AM",
+      "slaHoursRemaining": 1,
+      "isSlaAtRisk": true,
+      "createdAt": "18 Aug 2026, 05:05 AM",
+      "updatedAt": "18 Aug 2026, 06:00 AM",
+      "auditLogs": []
+    }
+  ],
+  "workers": [
+    {
+      "id": "w-1",
+      "name": "Amit Kumar",
+      "role": "Senior Field Technician",
+      "phone": "+91 98712 45890",
+      "department": "Road Maintenance",
+      "team": "Rapid Pothole Patching Squad A",
+      "currentTasksCount": 2,
+      "equipment": [
+        "Bituminous Cold Mix Applicator",
+        "Vibratory Plate Compactor",
+        "Laser Leveler",
+        "Safety Barricades"
+      ]
+    },
+    {
+      "id": "w-2",
+      "name": "Rajesh Verma",
+      "role": "Electrical Supervisor",
+      "phone": "+91 98110 33412",
+      "department": "Electrical & Lighting",
+      "team": "Zone 2 Streetlight Rapid Squad",
+      "currentTasksCount": 3,
+      "equipment": [
+        "Hydraulic Bucket Truck (15m)",
+        "Multimeter & Cable Fault Locator",
+        "LED Fixture Replacements"
+      ]
+    },
+    {
+      "id": "w-3",
+      "name": "Suresh Nagar",
+      "role": "Sanitation Inspector",
+      "phone": "+91 97188 90123",
+      "department": "Sanitation & Solid Waste",
+      "team": "Heavy Waste Clearance Unit",
+      "currentTasksCount": 1,
+      "equipment": [
+        "Hydraulic Dumper Placer",
+        "Mechanical Road Sweeper",
+        "Disinfectant Spray Unit"
+      ]
+    },
+    {
+      "id": "w-4",
+      "name": "Pooja Sharma",
+      "role": "Civil Sub-Engineer",
+      "phone": "+91 99532 11980",
+      "department": "Drainage & Sewerage",
+      "team": "Monsoon Desilting & Manhole Crew",
+      "currentTasksCount": 2,
+      "equipment": [
+        "Super Sucker Jetting Machine",
+        "Gas Detector",
+        "Cast Iron Manhole Replacement Frames"
+      ]
+    },
+    {
+      "id": "w-5",
+      "name": "Dinesh Chandra",
+      "role": "Water Works Foreman",
+      "phone": "+91 98101 77654",
+      "department": "Water Supply & Pipelines",
+      "team": "High-Pressure Pipeline Response",
+      "currentTasksCount": 1,
+      "equipment": [
+        "Ductile Iron Pipe Cutters",
+        "Electrofusion Welding Rig",
+        "Ultrasonic Flow Leak Detector"
+      ]
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "hs-1",
+      "name": "Knowledge Park III University Corridor",
+      "ward": "Ward 12",
+      "category": "Pothole",
+      "incidentCount": 17,
+      "recurrenceScore": "High (4.8/5)",
+      "riskLevel": "CRITICAL",
+      "suggestedCapitalWork": "Sub-base bituminous overlay & concrete curb reinforcement (Estimated Capital Plan FY27)",
+      "estimatedBudget": "₹ 42.5 Lakhs",
+      "coordinates": [
+        28.4632,
+        77.4912
+      ]
+    },
+    {
+      "id": "hs-2",
+      "name": "Pari Chowk & Alpha 1 Transit Hub",
+      "ward": "Ward 8",
+      "category": "Garbage",
+      "incidentCount": 14,
+      "recurrenceScore": "High (4.2/5)",
+      "riskLevel": "HIGH",
+      "suggestedCapitalWork": "Installation of automated underground compactor bins & smart fill sensors",
+      "estimatedBudget": "₹ 28.0 Lakhs",
+      "coordinates": [
+        28.4735,
+        77.5028
+      ]
+    },
+    {
+      "id": "hs-3",
+      "name": "Delta 1 Residential Water Grid",
+      "ward": "Ward 7",
+      "category": "Water Leakage",
+      "incidentCount": 11,
+      "recurrenceScore": "Moderate (3.6/5)",
+      "riskLevel": "HIGH",
+      "suggestedCapitalWork": "Replacement of aging 200mm asbestos-cement branch pipes with ductile iron pipelines",
+      "estimatedBudget": "₹ 35.2 Lakhs",
+      "coordinates": [
+        28.4892,
+        77.5218
+      ]
+    },
+    {
+      "id": "hs-4",
+      "name": "Beta 2 Commercial Spine",
+      "ward": "Ward 4",
+      "category": "Streetlight",
+      "incidentCount": 9,
+      "recurrenceScore": "Moderate (3.1/5)",
+      "riskLevel": "MODERATE",
+      "suggestedCapitalWork": "Underground cabling replacement & smart feeder panel installation with central SCADA",
+      "estimatedBudget": "₹ 19.8 Lakhs",
+      "coordinates": [
+        28.471,
+        77.498
+      ]
+    }
+  ]
+}

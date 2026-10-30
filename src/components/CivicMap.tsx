@@ -37,9 +37,9 @@ export const CivicMap: React.FC<CivicMapProps> = ({
         scrollWheelZoom: true
       });
 
-      // Professional Clean Positron OpenStreetMap Tiles
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      // Standard OpenStreetMap Tiles (Fast, Free, No API key watermark)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(map);
 

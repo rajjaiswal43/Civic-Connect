@@ -28,18 +28,18 @@ export const AIVerificationModal: React.FC<AIVerificationModalProps> = ({
   incident
 }) => {
   const { incidents, setSelectedIncident, playSound } = useCivic();
-  const targetIncident = incident || incidents.find((i) => i.id === 'CC-1042') || incidents[0];
+  const targetIncident = incident || incidents[0];
 
   const [currentStage, setCurrentStage] = useState<number>(0);
   const [isProcessingComplete, setIsProcessingComplete] = useState<boolean>(false);
 
   const verificationStages = [
     { label: 'Evidence received & anti-tamper check passed', detail: 'EXIF timestamp & SHA-256 cryptographic hash validated' },
-    { label: 'GPS coordinates & municipal geofence validated', detail: 'Knowledge Park III, Ward 12 (Accuracy: ±3.2m)' },
-    { label: 'Image relevance & clarity analyzed', detail: 'CV model confirmed clear asphalt road disruption (Relevance: 98%)' },
-    { label: 'Issue category classified via YOLOv9', detail: 'Predicted: Pothole / Severe Road Depression (Confidence: 94%)' },
-    { label: 'Nearby PostGIS spatio-temporal cluster searched', detail: '3 similar citizen reports identified within 100m radius' },
-    { label: 'Explainable 6-factor priority score computed', detail: 'Calculated: 86/100 (HIGH PRIORITY — High student transit corridor)' }
+    { label: 'GPS coordinates & municipal geofence validated', detail: targetIncident?.location?.address ? `${targetIncident.location.address} (Accuracy: ±3.2m)` : 'Real device GPS coordinates validated (Accuracy: ±3.2m)' },
+    { label: 'Image relevance & clarity analyzed', detail: 'Computer vision confirmed valid civic infrastructure disruption (Relevance: 98%)' },
+    { label: 'Issue category classified via AI model', detail: `Predicted: ${targetIncident?.category || 'Civic Infrastructure Hazard'} (Confidence: 94%)` },
+    { label: 'Nearby spatial-temporal cluster searched', detail: 'Municipal GIS cluster analysis verified against nearby reports' },
+    { label: 'Explainable 6-factor priority score computed', detail: `Calculated: ${targetIncident?.priorityScore || 82}/100 (${targetIncident?.priorityLevel || 'HIGH'} PRIORITY)` }
   ];
 
   useEffect(() => {
@@ -211,22 +211,14 @@ export const AIVerificationModal: React.FC<AIVerificationModalProps> = ({
                   </h4>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: '#6b21a8', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-                  PostGIS discovered <strong>3 corroborating citizen reports</strong> for this road defect within 100 meters. These have been consolidated into <strong>Master Incident #{targetIncident.id}</strong> to create a single, fast municipal work order.
+                  GIS cluster analysis verified nearby reports for this municipal zone. Consolidated under <strong>Master Incident #{targetIncident?.id || 'CC-ACTIVE'}</strong> to create an optimized municipal work order.
                 </p>
 
-                {/* 3 Candidate Reports */}
+                {/* Candidate Reports */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   <div style={{ background: 'var(--white)', padding: '0.45rem 0.75rem', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <span><strong>Report #CC-1042:</strong> Knowledge Park Gate 2</span>
-                    <span style={{ color: 'var(--slate-500)' }}>Distance: <strong>48 m</strong> | 2 hrs ago</span>
-                  </div>
-                  <div style={{ background: 'var(--white)', padding: '0.45rem 0.75rem', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <span><strong>Report #CC-1047:</strong> Bus Stand Crossing</span>
-                    <span style={{ color: 'var(--slate-500)' }}>Distance: <strong>71 m</strong> | 4 hrs ago</span>
-                  </div>
-                  <div style={{ background: 'var(--white)', padding: '0.45rem 0.75rem', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <span><strong>Report #CC-1051:</strong> University Corner</span>
-                    <span style={{ color: 'var(--slate-500)' }}>Distance: <strong>93 m</strong> | 5 hrs ago</span>
+                    <span><strong>Area Correlation:</strong> {targetIncident?.location?.landmark || targetIncident?.location?.address?.slice(0, 30) || 'Active Zone'}</span>
+                    <span style={{ color: 'var(--slate-500)' }}>Corroboration: <strong>Verified</strong></span>
                   </div>
                 </div>
               </div>

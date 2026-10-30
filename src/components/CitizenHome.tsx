@@ -214,7 +214,7 @@ export const CitizenHome: React.FC = () => {
               Nearby Civic Incidents Radar Map
             </h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
-              Live geospatial radar centered on Greater Noida (Click any pin to inspect evidence & corroborate)
+              Live geospatial radar for reported incidents (Click any pin to inspect evidence &amp; corroborate)
             </p>
           </div>
 
@@ -222,7 +222,7 @@ export const CitizenHome: React.FC = () => {
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', overflowX: 'auto', maxWidth: '60%' }}>
             <span style={{ fontSize: '0.68rem', background: 'rgba(34,197,94,0.15)', color: '#15803d', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
-              GPS Locked: Knowledge Park III
+              {userLocality ? `GPS Active: ${userLocality}` : 'GPS Radar Active'}
             </span>
             {categories.slice(0, 4).map((cat) => (
               <button
